@@ -1,0 +1,159 @@
+import 'package:flutter/foundation.dart';
+import '../models/accident_master.dart';
+import '../models/accident_record.dart';
+import '../repositories/accident_repository.dart';
+
+/// 事故記録の状態管理サービス（Provider経由でアプリ全体から利用）
+class AccidentService extends ChangeNotifier {
+  final AccidentRepository _repository;
+  List<AccidentRecord> _records = [];
+  bool _isLoading = false;
+  String? _error;
+
+  AccidentService(this._repository);
+
+  List<AccidentRecord> get records => List.unmodifiable(_records);
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  Future<void> loadRecords() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _records = await _repository.getAll();
+      _records.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    } catch (e) {
+      _error = 'データの読み込みに失敗しました: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> addRecord(AccidentRecord record) async {
+    try {
+      await _repository.save(record);
+      _records.insert(0, record);
+      _records.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+      notifyListeners();
+    } catch (e) {
+      _error = '保存に失敗しました: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateRecord(AccidentRecord record) async {
+    try {
+      await _repository.save(record);
+      final idx = _records.indexWhere((r) => r.id == record.id);
+      if (idx != -1) {
+        _records[idx] = record;
+      }
+      notifyListeners();
+    } catch (e) {
+      _error = '更新に失敗しました: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteRecord(String id) async {
+    try {
+      await _repository.delete(id);
+      _records.removeWhere((r) => r.id == id);
+      notifyListeners();
+    } catch (e) {
+      _error = '削除に失敗しました: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> importRecords(List<AccidentRecord> newRecords) async {
+    try {
+      await _repository.saveAll(newRecords);
+      await loadRecords();
+    } catch (e) {
+      _error = 'インポートに失敗しました: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // ---------- 集計・分析用ヘルパー ----------
+
+  List<int> get availableFiscalYears {
+    final years = _records.map((r) => r.fiscalYear).toSet().toList();
+    years.sort((a, b) => b.compareTo(a));
+    return years;
+  }
+
+  List<AccidentRecord> byFiscalYear(int fiscalYear) {
+    return _records.where((r) => r.fiscalYear == fiscalYear).toList();
+  }
+
+  /// 年度内の月別件数 (4月〜3月の順)
+  Map<int, int> monthlyCountByFiscalYear(int fiscalYear) {
+    final months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    final result = {for (final m in months) m: 0};
+    for (final r in byFiscalYear(fiscalYear)) {
+      result[r.fiscalMonth] = (result[r.fiscalMonth] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  /// 発生区分別件数
+  Map<AccidentType, int> typeBreakdown(int fiscalYear) {
+    final result = <AccidentType, int>{};
+    for (final r in byFiscalYear(fiscalYear)) {
+      result[r.accidentType] = (result[r.accidentType] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  /// 発生部署別件数
+  Map<OfficeDept, int> officeBreakdown(int fiscalYear) {
+    final result = <OfficeDept, int>{};
+    for (final r in byFiscalYear(fiscalYear)) {
+      result[r.office] = (result[r.office] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  /// 部品事故の発生要因別件数
+  Map<PartsAccidentCause, int> partsCauseBreakdown(int fiscalYear) {
+    final result = <PartsAccidentCause, int>{};
+    for (final r in byFiscalYear(fiscalYear)) {
+      if (r.partsCause != null) {
+        result[r.partsCause!] = (result[r.partsCause!] ?? 0) + 1;
+      }
+    }
+    return result;
+  }
+
+  /// 原因分析未完了件数
+  int uncompletedAnalysisCount(int fiscalYear) {
+    return byFiscalYear(
+      fiscalYear,
+    ).where((r) => r.status == RecordStatus.reported).length;
+  }
+
+  /// 承認済み件数
+  int approvedCount(int fiscalYear) {
+    return byFiscalYear(
+      fiscalYear,
+    ).where((r) => r.status == RecordStatus.approved).length;
+  }
+
+  /// 年度別総額
+  double totalAmount(int fiscalYear) {
+    return byFiscalYear(fiscalYear).fold(0, (sum, r) => sum + r.amount);
+  }
+
+  /// 年度比較用: 複数年度の月別件数
+  Map<int, Map<int, int>> multiYearMonthlyComparison(List<int> fiscalYears) {
+    return {for (final fy in fiscalYears) fy: monthlyCountByFiscalYear(fy)};
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88979037871",
+    "project_id": "idex-trouble-management",
+    "storage_bucket": "idex-trouble-management.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88979037871:android:0d206ae22d3574f7057e5a",
+        "android_client_info": {
+          "package_name": "com.accidentmanager.manage"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcmyiL1V9RWsz_GCpHT5xqm4vZC4T71kI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
