@@ -149,9 +149,58 @@ class AccidentService extends ChangeNotifier {
     ).where((r) => r.status == RecordStatus.analyzed).length;
   }
 
-  /// 年度別総額
+  /// 年度別総額（賠償金額＋事故処理諸費用の合計）
+  /// ※　以前の「金額」入力欄は廃止したため、実際に入力される2項目で集計する。
   double totalAmount(int fiscalYear) {
-    return byFiscalYear(fiscalYear).fold(0, (sum, r) => sum + r.amount);
+    return byFiscalYear(fiscalYear).fold(
+      0,
+      (sum, r) => sum + r.compensationAmount + r.processingCost,
+    );
+  }
+
+  /// 班別件数（小集団活動の月次集計用）
+  Map<Team, int> teamBreakdown(int fiscalYear) {
+    final result = <Team, int>{};
+    for (final r in byFiscalYear(fiscalYear)) {
+      result[r.team] = (result[r.team] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  /// 班別・月別件数（班別の月次集計用）
+  Map<int, int> monthlyCountByTeam(int fiscalYear, Team team) {
+    final months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    final result = {for (final m in months) m: 0};
+    for (final r in byFiscalYear(fiscalYear).where((r) => r.team == team)) {
+      result[r.fiscalMonth] = (result[r.fiscalMonth] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  /// 庸車事故（発生部署＝僭車）の件数
+  int charterAccidentCount(int fiscalYear) {
+    return byFiscalYear(fiscalYear).where((r) => r.office.isCharter).length;
+  }
+
+  /// 自社事故（発生部署＝僭車以外）の件数
+  int ownCompanyAccidentCount(int fiscalYear) {
+    return byFiscalYear(fiscalYear).where((r) => !r.office.isCharter).length;
+  }
+
+  /// 庸車事故・自社事故の月別件数比較
+  /// 戻り値: {true: 庸車の月別件数, false: 自社の月別件数}
+  Map<bool, Map<int, int>> charterVsOwnMonthlyComparison(int fiscalYear) {
+    final months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    final charter = {for (final m in months) m: 0};
+    final own = {for (final m in months) m: 0};
+    for (final r in byFiscalYear(fiscalYear)) {
+      if (r.office.isCharter) {
+        charter[r.fiscalMonth] = (charter[r.fiscalMonth] ?? 0) + 1;
+      } else {
+        own[r.fiscalMonth] = (own[r.fiscalMonth] ?? 0) + 1;
+      }
+    }
+    return {true: charter, false: own};
   }
 
   /// 年度比較用: 複数年度の月別件数

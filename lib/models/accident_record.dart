@@ -84,6 +84,7 @@ class AccidentRecord {
   final String id;
   final int no; // Excel由来の管理番号(通番)
   final OfficeDept office; // 発生部署
+  final Team team; // 班（小集団活動の班単位）
   final AccidentType accidentType; // 発生区分
   final PartsAccidentCause? partsCause; // 部品事故発生要因（部品事故の場合のみ）
   final DateTime occurredAt; // 発生日時
@@ -97,8 +98,6 @@ class AccidentRecord {
   final int? yearsOfServiceMonth; // 勤続年数(月)
   final int? yearsOfExperienceYear; // 業務経験年数(年)
   final int? yearsOfExperienceMonth; // 業務経験年数(月)
-  final double amount; // 金額
-  final String rank; // ランク（重大度、手入力）
   final InsuranceStatus insurance; // 保険有無
   final double compensationAmount; // 賠償金額(支払金額)
   final double processingCost; // 事故処理諸費用
@@ -116,6 +115,7 @@ class AccidentRecord {
     String? id,
     required this.no,
     required this.office,
+    this.team = Team.unassigned,
     required this.accidentType,
     this.partsCause,
     required this.occurredAt,
@@ -129,8 +129,6 @@ class AccidentRecord {
     this.yearsOfServiceMonth,
     this.yearsOfExperienceYear,
     this.yearsOfExperienceMonth,
-    this.amount = 0,
-    this.rank = '',
     this.insurance = InsuranceStatus.unknown,
     this.compensationAmount = 0,
     this.processingCost = 0,
@@ -159,6 +157,7 @@ class AccidentRecord {
     'id': id,
     'no': no,
     'office': office.name,
+    'team': team.name,
     'accidentType': accidentType.name,
     'partsCause': partsCause?.name,
     'occurredAt': occurredAt.toIso8601String(),
@@ -172,8 +171,6 @@ class AccidentRecord {
     'yearsOfServiceMonth': yearsOfServiceMonth,
     'yearsOfExperienceYear': yearsOfExperienceYear,
     'yearsOfExperienceMonth': yearsOfExperienceMonth,
-    'amount': amount,
-    'rank': rank,
     'insurance': insurance.name,
     'compensationAmount': compensationAmount,
     'processingCost': processingCost,
@@ -196,6 +193,12 @@ class AccidentRecord {
         (e) => e.name == map['office'],
         orElse: () => OfficeDept.unknown,
       ),
+      // 既存データ(班導入以前のExcel移行データ等)にはteamが存在しないため、
+      // その場合は「未設定」として扱う(後方互換)。
+      team: Team.values.firstWhere(
+        (e) => e.name == map['team'],
+        orElse: () => Team.unassigned,
+      ),
       accidentType: AccidentType.values.firstWhere(
         (e) => e.name == map['accidentType'],
         orElse: () => AccidentType.property,
@@ -217,8 +220,6 @@ class AccidentRecord {
       yearsOfServiceMonth: map['yearsOfServiceMonth'] as int?,
       yearsOfExperienceYear: map['yearsOfExperienceYear'] as int?,
       yearsOfExperienceMonth: map['yearsOfExperienceMonth'] as int?,
-      amount: (map['amount'] as num?)?.toDouble() ?? 0,
-      rank: map['rank'] as String? ?? '',
       insurance: InsuranceStatus.values.firstWhere(
         (e) => e.name == map['insurance'],
         orElse: () => InsuranceStatus.unknown,
@@ -249,6 +250,7 @@ class AccidentRecord {
   AccidentRecord copyWith({
     int? no,
     OfficeDept? office,
+    Team? team,
     AccidentType? accidentType,
     PartsAccidentCause? partsCause,
     bool clearPartsCause = false,
@@ -261,8 +263,6 @@ class AccidentRecord {
     int? yearsOfServiceMonth,
     int? yearsOfExperienceYear,
     int? yearsOfExperienceMonth,
-    double? amount,
-    String? rank,
     InsuranceStatus? insurance,
     double? compensationAmount,
     double? processingCost,
@@ -279,6 +279,7 @@ class AccidentRecord {
       id: id,
       no: no ?? this.no,
       office: office ?? this.office,
+      team: team ?? this.team,
       accidentType: accidentType ?? this.accidentType,
       partsCause: clearPartsCause ? null : (partsCause ?? this.partsCause),
       occurredAt: newOccurredAt,
@@ -294,8 +295,6 @@ class AccidentRecord {
           yearsOfExperienceYear ?? this.yearsOfExperienceYear,
       yearsOfExperienceMonth:
           yearsOfExperienceMonth ?? this.yearsOfExperienceMonth,
-      amount: amount ?? this.amount,
-      rank: rank ?? this.rank,
       insurance: insurance ?? this.insurance,
       compensationAmount: compensationAmount ?? this.compensationAmount,
       processingCost: processingCost ?? this.processingCost,

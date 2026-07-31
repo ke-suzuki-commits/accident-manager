@@ -17,6 +17,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
   int? _yearFilter;
   AccidentType? _typeFilter;
   OfficeDept? _officeFilter;
+  Team? _teamFilter;
   String _keyword = '';
 
   @override
@@ -35,6 +36,9 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
         }
         if (_officeFilter != null) {
           records = records.where((r) => r.office == _officeFilter).toList();
+        }
+        if (_teamFilter != null) {
+          records = records.where((r) => r.team == _teamFilter).toList();
         }
         if (_keyword.isNotEmpty) {
           final kw = _keyword.toLowerCase();
@@ -82,6 +86,8 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                         _filterDropdownType(),
                         const SizedBox(width: 8),
                         _filterDropdownOffice(),
+                        const SizedBox(width: 8),
+                        _filterDropdownTeam(),
                       ],
                     ),
                   ),
@@ -149,6 +155,17 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
       itemLabel: (o) => o.label,
       onSelected: (v) => setState(() => _officeFilter = v),
       onClear: () => setState(() => _officeFilter = null),
+    );
+  }
+
+  Widget _filterDropdownTeam() {
+    return _FilterChipDropdown<Team>(
+      label: _teamFilter?.label ?? '班',
+      selected: _teamFilter != null,
+      items: Team.values,
+      itemLabel: (t) => t.label,
+      onSelected: (v) => setState(() => _teamFilter = v),
+      onClear: () => setState(() => _teamFilter = null),
     );
   }
 }

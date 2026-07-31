@@ -44,8 +44,11 @@ class AiAnalysisException implements Exception {
 /// 呼び出す実装としている。Firebase接続後は、この呼び出しをCloud Functions経由に
 /// 差し替えることを推奨(呼び出し元のインターフェースは変更不要な設計にしてある)。
 class AiAnalysisService {
+  // 注記: gemini-2.0-flash / gemini-2.5-flash 系は提供終了(廃止)により
+  // 新規ユーザーが利用できないため、動作確認済みの gemini-flash-latest
+  // (実体: gemini-3.6-flash) を使用する。
   static const _endpoint =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
   Future<AiAnalysisResult> generateCauseAnalysis({
     required String apiKey,
@@ -105,6 +108,7 @@ class AiAnalysisService {
 
 【事故情報】
 - 発生部署: ${record.office.label}
+- 班: ${record.team.label}
 - 発生区分: ${record.accidentType.label}
 ${record.partsCause != null ? '- 部品事故の発生要因: ${record.partsCause!.label}' : ''}
 - 発生場所: ${record.location}

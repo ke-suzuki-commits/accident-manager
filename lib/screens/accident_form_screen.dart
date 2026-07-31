@@ -17,6 +17,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late OfficeDept _office;
+  late Team _team;
   late AccidentType _accidentType;
   PartsAccidentCause? _partsCause;
   late DateTime _occurredAt;
@@ -26,10 +27,10 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
   final _driverNameCtrl = TextEditingController();
   final _employeeNumberCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
+  final _yearsOfServiceYearCtrl = TextEditingController();
+  final _yearsOfServiceMonthCtrl = TextEditingController();
   final _counterpartyCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
-  final _rankCtrl = TextEditingController();
   final _compensationCtrl = TextEditingController();
   final _processingCostCtrl = TextEditingController();
 
@@ -40,6 +41,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     super.initState();
     final e = widget.existing;
     _office = e?.office ?? OfficeDept.first;
+    _team = e?.team ?? Team.unassigned;
     _accidentType = e?.accidentType ?? AccidentType.property;
     _partsCause = e?.partsCause;
     _occurredAt = e?.occurredAt ?? DateTime.now();
@@ -49,12 +51,10 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     _driverNameCtrl.text = e?.driverName ?? '';
     _employeeNumberCtrl.text = e?.employeeNumber ?? '';
     _ageCtrl.text = e?.age?.toString() ?? '';
+    _yearsOfServiceYearCtrl.text = e?.yearsOfServiceYear?.toString() ?? '';
+    _yearsOfServiceMonthCtrl.text = e?.yearsOfServiceMonth?.toString() ?? '';
     _counterpartyCtrl.text = e?.counterparty ?? '';
     _descriptionCtrl.text = e?.description ?? '';
-    _amountCtrl.text = e != null && e.amount != 0
-        ? e.amount.toStringAsFixed(0)
-        : '';
-    _rankCtrl.text = e?.rank ?? '';
     _compensationCtrl.text = e != null && e.compensationAmount != 0
         ? e.compensationAmount.toStringAsFixed(0)
         : '';
@@ -69,10 +69,10 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     _driverNameCtrl.dispose();
     _employeeNumberCtrl.dispose();
     _ageCtrl.dispose();
+    _yearsOfServiceYearCtrl.dispose();
+    _yearsOfServiceMonthCtrl.dispose();
     _counterpartyCtrl.dispose();
     _descriptionCtrl.dispose();
-    _amountCtrl.dispose();
-    _rankCtrl.dispose();
     _compensationCtrl.dispose();
     _processingCostCtrl.dispose();
     super.dispose();
@@ -115,6 +115,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
           (service.records.map((r) => r.no).fold(0, (a, b) => a > b ? a : b) +
               1),
       office: _office,
+      team: _team,
       accidentType: _accidentType,
       partsCause: _accidentType == AccidentType.parts ? _partsCause : null,
       occurredAt: _occurredAt,
@@ -122,10 +123,10 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       driverName: _driverNameCtrl.text.trim(),
       employeeNumber: _employeeNumberCtrl.text.trim(),
       age: int.tryParse(_ageCtrl.text),
+      yearsOfServiceYear: int.tryParse(_yearsOfServiceYearCtrl.text),
+      yearsOfServiceMonth: int.tryParse(_yearsOfServiceMonthCtrl.text),
       counterparty: _counterpartyCtrl.text.trim(),
       description: _descriptionCtrl.text.trim(),
-      amount: double.tryParse(_amountCtrl.text) ?? 0,
-      rank: _rankCtrl.text.trim(),
       insurance: _insurance,
       compensationAmount: double.tryParse(_compensationCtrl.text) ?? 0,
       processingCost: double.tryParse(_processingCostCtrl.text) ?? 0,
@@ -173,6 +174,14 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                     onChanged: (v) => setState(() => _office = v!),
                   ),
                   const SizedBox(height: 12),
+                  _dropdownField<Team>(
+                    label: '班',
+                    value: _team,
+                    items: Team.values,
+                    itemLabel: (e) => e.label,
+                    onChanged: (v) => setState(() => _team = v!),
+                  ),
+                  const SizedBox(height: 12),
                   _dropdownField<AccidentType>(
                     label: '発生区分',
                     value: _accidentType,
@@ -218,15 +227,29 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                     '年齢',
                     keyboardType: TextInputType.number,
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _textField(
+                          _yearsOfServiceYearCtrl,
+                          '勤続年数（年）',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _textField(
+                          _yearsOfServiceMonthCtrl,
+                          '勤続年数（月）',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
                 ]),
                 const SizedBox(height: 16),
                 _sectionCard('金額・保険情報', [
-                  _textField(
-                    _amountCtrl,
-                    '金額',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 12),
                   _textField(
                     _compensationCtrl,
                     '賠償金額（支払金額）',
@@ -246,8 +269,6 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                     itemLabel: (e) => e.label,
                     onChanged: (v) => setState(() => _insurance = v!),
                   ),
-                  const SizedBox(height: 12),
-                  _textField(_rankCtrl, 'ランク（重大度・手入力）'),
                   const SizedBox(height: 12),
                   _textField(_counterpartyCtrl, '相手方/荷主'),
                 ]),

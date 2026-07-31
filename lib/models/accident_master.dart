@@ -4,8 +4,8 @@
 /// 発生部署（事故が発生した部門）
 enum OfficeDept {
   charter('傭車'),
-  first('第一輸送部'),
-  second('第二輸送部'),
+  first('輸送1課'),
+  second('輸送2課'),
   metal('メタル便'),
   warehouse('倉庫課'),
   unknown('責任区不明');
@@ -19,6 +19,11 @@ enum OfficeDept {
       orElse: () => OfficeDept.unknown,
     );
   }
+
+  /// 庸車(傭車)扱いの事故かどうか。
+  /// 役員要望により「庸車事故」と「自社事故」を分けて集計するための判定軸。
+  /// 発生部署が「傭車」の場合のみ庸車事故とし、それ以外は自社事故として扱う。
+  bool get isCharter => this == OfficeDept.charter;
 }
 
 /// 発生区分（事故の種別）
@@ -86,6 +91,38 @@ enum RecordStatus {
       // 過去データに残っている旧ステータス「承認済み」は
       // 「原因分析完了」として扱う(データ移行時の後方互換)。
       orElse: () => RecordStatus.analyzed,
+    );
+  }
+}
+
+/// 班（社内の小集団活動における班単位。A班〜O班）
+/// 役員要望により、班ごとの月次事故集計を可能にするための分類軸として追加。
+enum Team {
+  a('A班'),
+  b('B班'),
+  c('C班'),
+  d('D班'),
+  e('E班'),
+  f('F班'),
+  g('G班'),
+  h('H班'),
+  i('I班'),
+  j('J班'),
+  k('K班'),
+  l('L班'),
+  m('M班'),
+  n('N班'),
+  o('O班'),
+  unassigned('未設定');
+
+  final String label;
+  const Team(this.label);
+
+  static Team fromLabel(String? label) {
+    if (label == null) return Team.unassigned;
+    return Team.values.firstWhere(
+      (e) => e.label == label,
+      orElse: () => Team.unassigned,
     );
   }
 }

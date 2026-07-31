@@ -253,6 +253,8 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   Widget _buildInfoSection(AccidentRecord r) {
     final rows = <(String, String)>[
       ('発生部署', r.office.label),
+      ('発生区分（庸車/自社）', r.office.isCharter ? '庸車事故' : '自社事故'),
+      ('班', r.team.label),
       if (r.partsCause != null) ('発生要因', r.partsCause!.label),
       ('氏名', r.driverName.isEmpty ? '-' : r.driverName),
       ('社員番号', r.employeeNumber.isEmpty ? '-' : r.employeeNumber),
@@ -271,7 +273,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       ),
       ('相手方/荷主', r.counterparty.isEmpty ? '-' : r.counterparty),
       ('保険有無', r.insurance.label),
-      ('金額', r.amount == 0 ? '-' : '¥${_formatNumber(r.amount)}'),
       (
         '賠償金額',
         r.compensationAmount == 0
@@ -282,7 +283,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
         '事故処理諸費用',
         r.processingCost == 0 ? '-' : '¥${_formatNumber(r.processingCost)}',
       ),
-      ('ランク', r.rank.isEmpty ? '-' : r.rank),
     ];
 
     return Container(

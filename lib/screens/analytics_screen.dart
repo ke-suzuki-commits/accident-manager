@@ -59,6 +59,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 const SizedBox(height: 12),
                 _buildOfficeComparisonChart(service),
                 const SizedBox(height: 24),
+                _sectionTitle('庸車事故 / 自社事故 比較'),
+                const SizedBox(height: 12),
+                _buildCharterVsOwnSummary(service),
+                const SizedBox(height: 24),
+                _sectionTitle('班別 件数集計'),
+                const SizedBox(height: 12),
+                _buildTeamBreakdownChart(service),
+                const SizedBox(height: 24),
                 _sectionTitle('部品事故 発生要因ランキング'),
                 const SizedBox(height: 12),
                 _buildPartsCauseRanking(service),
@@ -375,6 +383,276 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 庸車事故（発生部署＝傭車）と自社事故を分けて件数比較するサマリーカード。
+  /// 役員要望②「庸車事故と自社での事故は分けて集計」に対応。
+  Widget _buildCharterVsOwnSummary(AccidentService service) {
+    final selectedYearsList = _selectedYears.toList()..sort();
+    if (selectedYearsList.isEmpty) return const SizedBox();
+
+    int charterTotal = 0;
+    int ownTotal = 0;
+    for (final y in selectedYearsList) {
+      charterTotal += service.charterAccidentCount(y);
+      ownTotal += service.ownCompanyAccidentCount(y);
+    }
+    final total = charterTotal + ownTotal;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _charterOwnCard(
+                  label: '庸車事故',
+                  count: charterTotal,
+                  total: total,
+                  color: AppColors.cardYellow,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _charterOwnCard(
+                  label: '自社事故',
+                  count: ownTotal,
+                  total: total,
+                  color: AppColors.secondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildCharterVsOwnMonthlyChart(service, selectedYearsList),
+        ],
+      ),
+    );
+  }
+
+  Widget _charterOwnCard({
+    required String label,
+    required int count,
+    required int total,
+    required Color color,
+  }) {
+    final pct = total == 0 ? 0 : (count / total * 100);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$count件',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            '全体の${pct.toStringAsFixed(1)}%',
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 選択年度をまとめた庸車/自社の月別件数推移（積み上げ表現ではなく単純比較）
+  Widget _buildCharterVsOwnMonthlyChart(
+    AccidentService service,
+    List<int> selectedYearsList,
+  ) {
+    final months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    final charterMonthly = {for (final m in months) m: 0};
+    final ownMonthly = {for (final m in months) m: 0};
+    for (final y in selectedYearsList) {
+      final cmp = service.charterVsOwnMonthlyComparison(y);
+      for (final m in months) {
+        charterMonthly[m] = charterMonthly[m]! + (cmp[true]?[m] ?? 0);
+        ownMonthly[m] = ownMonthly[m]! + (cmp[false]?[m] ?? 0);
+      }
+    }
+    double maxY = 4;
+    for (final m in months) {
+      if (charterMonthly[m]!.toDouble() > maxY) maxY = charterMonthly[m]!.toDouble();
+      if (ownMonthly[m]!.toDouble() > maxY) maxY = ownMonthly[m]!.toDouble();
+    }
+
+    return SizedBox(
+      height: 200,
+      child: BarChart(
+        BarChartData(
+          maxY: maxY + 1,
+          borderData: FlBorderData(show: false),
+          gridData: const FlGridData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= months.length) {
+                    return const SizedBox();
+                  }
+                  return Text(
+                    '${months[idx]}月',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: AppColors.textSecondary,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          barGroups: [
+            for (int i = 0; i < months.length; i++)
+              BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: charterMonthly[months[i]]!.toDouble(),
+                    color: AppColors.cardYellow,
+                    width: 6,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  BarChartRodData(
+                    toY: ownMonthly[months[i]]!.toDouble(),
+                    color: AppColors.secondary,
+                    width: 6,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 班別（A班〜O班）の件数集計。役員要望①に対応。
+  Widget _buildTeamBreakdownChart(AccidentService service) {
+    final selectedYearsList = _selectedYears.toList()..sort();
+    if (selectedYearsList.isEmpty) return const SizedBox();
+
+    final merged = <Team, int>{};
+    for (final y in selectedYearsList) {
+      service.teamBreakdown(y).forEach((k, v) => merged[k] = (merged[k] ?? 0) + v);
+    }
+    // 「未設定」は班未入力の過去データ用。集計上は表示するが末尾に回す。
+    final teams = Team.values.where((t) => t != Team.unassigned).toList();
+    final unassignedCount = merged[Team.unassigned] ?? 0;
+
+    double maxY = 4;
+    for (final t in teams) {
+      final v = (merged[t] ?? 0).toDouble();
+      if (v > maxY) maxY = v;
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 20, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 220,
+            child: BarChart(
+              BarChartData(
+                maxY: maxY + 1,
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= teams.length) {
+                          return const SizedBox();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            teams[idx].label,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                barGroups: [
+                  for (int i = 0; i < teams.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: (merged[teams[i]] ?? 0).toDouble(),
+                          gradient: AppColors.headerGradient,
+                          width: 14,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (unassignedCount > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '※班未設定のデータ: $unassignedCount件（Excel移行データ等）',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
