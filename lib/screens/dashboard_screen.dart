@@ -117,6 +117,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // 年度選択チップ。
+  // ※以前はChoiceChip(Material標準)を使用していたが、選択時に自動挿入される
+  //   チェックマークアイコンと、狭いpadding設定の組み合わせにより、
+  //   ラベル文字列の右端(「年度」の「度」)が見切れる不具合があった。
+  //   事故一覧のフィルターチップと同様に、幅を内容に合わせて自動調整する
+  //   独自Container実装に置き換えることで、見切れを確実に防止する。
   Widget _buildYearSelector(
     List<int> years,
     int currentYear,
@@ -125,7 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final allYears = {...years, currentYear}.toList()
       ..sort((a, b) => b.compareTo(a));
     return SizedBox(
-      height: 44,
+      height: 46,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
@@ -134,21 +140,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         itemBuilder: (context, index) {
           final year = allYears[index];
           final selected = year == selectedYear;
-          return ChoiceChip(
-            label: Text(
-              '$year年度',
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
-                height: 1.2,
+          return GestureDetector(
+            onTap: () => setState(() => _selectedYear = year),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.secondary : Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.secondary
+                      : const Color(0xFFE0E0E0),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    const Icon(
+                      Icons.check_rounded,
+                      size: 15,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    '$year年度',
+                    style: TextStyle(
+                      color: selected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
-            selected: selected,
-            selectedColor: AppColors.secondary,
-            backgroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            onSelected: (_) => setState(() => _selectedYear = year),
           );
         },
       ),
