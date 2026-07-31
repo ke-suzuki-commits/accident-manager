@@ -125,23 +125,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final allYears = {...years, currentYear}.toList()
       ..sort((a, b) => b.compareTo(a));
     return SizedBox(
-      height: 40,
+      height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
         itemCount: allYears.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final year = allYears[index];
           final selected = year == selectedYear;
           return ChoiceChip(
-            label: Text('$year年度'),
+            label: Text(
+              '$year年度',
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                height: 1.2,
+              ),
+            ),
             selected: selected,
             selectedColor: AppColors.secondary,
-            labelStyle: TextStyle(
-              color: selected ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
             backgroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             onSelected: (_) => setState(() => _selectedYear = year),
           );
         },

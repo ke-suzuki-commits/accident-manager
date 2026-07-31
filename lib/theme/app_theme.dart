@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/accident_master.dart';
 
 /// カラフル・モダンデザイン（スタイル2）のカラーパレット
@@ -79,9 +78,22 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
     );
 
-    final textTheme = GoogleFonts.notoSansJpTextTheme(base.textTheme).apply(
+    // 【修正】google_fontsは実行時にNoto Sans JPをネットワーク経由(fonts.gstatic.com)で
+    // 取得する仕様のため、取得失敗時にウィジェット再描画が繰り返しクラッシュし、
+    // 「事故一覧」画面の灰色オーバーレイや年度チップの表示崩れの原因になっていた。
+    // OS/ブラウザ標準搭載のゴシック体フォントスタックを直接指定することで、
+    // ネットワーク依存を排除しつつゴシック体統一の方針を維持する。
+    final textTheme = base.textTheme.apply(
       bodyColor: AppColors.textPrimary,
       displayColor: AppColors.textPrimary,
+      fontFamilyFallback: const [
+        'Noto Sans JP',
+        'Hiragino Sans',
+        'Hiragino Kaku Gothic ProN',
+        'Yu Gothic UI',
+        'Meiryo',
+        'sans-serif',
+      ],
     );
 
     return base.copyWith(
@@ -105,7 +117,10 @@ class AppTheme {
       chipTheme: base.chipTheme.copyWith(
         labelStyle: textTheme.labelMedium?.copyWith(
           fontWeight: FontWeight.w600,
+          height: 1.2,
         ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       inputDecorationTheme: InputDecorationTheme(

@@ -118,6 +118,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildComparisonChart(AccidentService service) {
     final months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
     final selectedYearsList = _selectedYears.toList()..sort();
+
+    // データが無い状態でLineChartに空のlineBarsDataを渡すと、
+    // fl_chartの内部レイアウト処理でnull-check例外が発生することがある。
+    // (IndexedStackで本画面が非表示でも常時ビルドされるため、
+    //  他タブの表示にまで影響する重大な不具合の原因だった)
+    if (selectedYearsList.isEmpty) {
+      return Container(
+        height: 260,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          '比較する年度を選択してください',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
     final data = service.multiYearMonthlyComparison(selectedYearsList);
 
     double maxY = 4;
