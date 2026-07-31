@@ -88,27 +88,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     ),
   );
 
+  // 年度の複数選択チップ。
+  // ※Material標準のFilterChipは、選択時に自動挿入されるチェックマーク
+  //   アイコンと狭いpaddingの組み合わせにより、ダッシュボードの年度チップと
+  //   同様にラベル右端が見切れる不具合が起こりうる。将来2027年度・2028年度と
+  //   チップが増えていくことを踏まえ、幅を内容に合わせて自動調整する
+  //   独自実装(Material+InkWellでタップ時のリップルも維持)に統一する。
   Widget _buildYearMultiSelect(List<int> years) {
     return Wrap(
       spacing: 8,
+      runSpacing: 8,
       children: [
         for (final y in years)
-          FilterChip(
-            label: Text('$y年度'),
+          _YearFilterChip(
+            year: y,
             selected: _selectedYears.contains(y),
-            selectedColor: AppColors.secondary,
-            labelStyle: TextStyle(
-              color: _selectedYears.contains(y)
-                  ? Colors.white
-                  : AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-            backgroundColor: Colors.white,
-            onSelected: (v) => setState(() {
-              if (v) {
-                _selectedYears.add(y);
-              } else {
+            onTap: () => setState(() {
+              if (_selectedYears.contains(y)) {
                 _selectedYears.remove(y);
+              } else {
+                _selectedYears.add(y);
               }
             }),
           ),
@@ -738,6 +737,63 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 年度複数選択用の独自チップ。ChoiceChip/FilterChipの見切れ不具合を
+/// 避けるため、内容に応じて幅が伸びるContainer実装＋InkWellのリップルで
+/// タップ時の視覚フィードバックを両立する。
+class _YearFilterChip extends StatelessWidget {
+  final int year;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _YearFilterChip({
+    required this.year,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.secondary : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppColors.secondary : const Color(0xFFE0E0E0),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                const Icon(
+                  Icons.check_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                '$year年度',
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../models/accident_master.dart';
 import '../models/accident_record.dart';
 import '../services/accident_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/kana_normalize.dart';
 
 class AccidentFormScreen extends StatefulWidget {
   final AccidentRecord? existing;
@@ -119,14 +120,17 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       accidentType: _accidentType,
       partsCause: _accidentType == AccidentType.parts ? _partsCause : null,
       occurredAt: _occurredAt,
-      location: _locationCtrl.text.trim(),
-      driverName: _driverNameCtrl.text.trim(),
+      // IME入力モードの誤りで半角カタカナが混在した場合の文字化け
+      // (例: 「ｽｽﾞｷ」の濁点が豆腐表示になる)を防ぐため、保存時に
+      // 全角カタカナへ正規化しておく。
+      location: normalizeHalfWidthKana(_locationCtrl.text.trim()),
+      driverName: normalizeHalfWidthKana(_driverNameCtrl.text.trim()),
       employeeNumber: _employeeNumberCtrl.text.trim(),
       age: int.tryParse(_ageCtrl.text),
       yearsOfServiceYear: int.tryParse(_yearsOfServiceYearCtrl.text),
       yearsOfServiceMonth: int.tryParse(_yearsOfServiceMonthCtrl.text),
-      counterparty: _counterpartyCtrl.text.trim(),
-      description: _descriptionCtrl.text.trim(),
+      counterparty: normalizeHalfWidthKana(_counterpartyCtrl.text.trim()),
+      description: normalizeHalfWidthKana(_descriptionCtrl.text.trim()),
       insurance: _insurance,
       compensationAmount: double.tryParse(_compensationCtrl.text) ?? 0,
       processingCost: double.tryParse(_processingCostCtrl.text) ?? 0,

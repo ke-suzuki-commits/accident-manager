@@ -7,6 +7,7 @@ import '../services/accident_service.dart';
 import '../services/ai_analysis_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/kana_normalize.dart';
 import 'accident_form_screen.dart';
 
 class AccidentDetailScreen extends StatefulWidget {
@@ -109,11 +110,12 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   Future<void> _saveAnalysis({required bool editedManually}) async {
     final updated = _record.copyWith(
       causeAnalysis: _record.causeAnalysis.copyWith(
-        why1: _why1Ctrl.text,
-        why2: _why2Ctrl.text,
-        why3: _why3Ctrl.text,
-        why4: _why4Ctrl.text,
-        rootCause: _rootCauseCtrl.text,
+        // 半角カタカナの濁点/半濁点による文字化けを防ぐため正規化する。
+        why1: normalizeHalfWidthKana(_why1Ctrl.text),
+        why2: normalizeHalfWidthKana(_why2Ctrl.text),
+        why3: normalizeHalfWidthKana(_why3Ctrl.text),
+        why4: normalizeHalfWidthKana(_why4Ctrl.text),
+        rootCause: normalizeHalfWidthKana(_rootCauseCtrl.text),
         isAiDraft: !editedManually && _record.causeAnalysis.isAiDraft,
         editedBy: context.read<SettingsService>().userName,
       ),

@@ -140,43 +140,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         itemBuilder: (context, index) {
           final year = allYears[index];
           final selected = year == selectedYear;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedYear = year),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.secondary : Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: selected
-                      ? AppColors.secondary
-                      : const Color(0xFFE0E0E0),
+          // ※タップ時にInkWellのリップル(波紋)効果で視覚的な反応を
+          //   明確にする。GestureDetector単体ではタップの見た目の
+          //   フィードバックが全く無く、「反応していない」と誤解されやすい。
+          return Material(
+            color: selected ? AppColors.secondary : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () => setState(() => _selectedYear = year),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selected) ...[
-                    const Icon(
-                      Icons.check_rounded,
-                      size: 15,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    '$year年度',
-                    style: TextStyle(
-                      color: selected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.secondary
+                        : const Color(0xFFE0E0E0),
                   ),
-                ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected) ...[
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      '$year年度',
+                      style: TextStyle(
+                        color: selected
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

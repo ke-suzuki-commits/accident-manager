@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import 'accident_master.dart';
+import '../utils/kana_normalize.dart';
 
 /// なぜなぜ分析（4回）＋真因
 class CauseAnalysis {
@@ -47,14 +48,17 @@ class CauseAnalysis {
 
   factory CauseAnalysis.fromMap(Map<dynamic, dynamic>? map) {
     if (map == null) return const CauseAnalysis();
+    // 半角カタカナの濁点/半濁点が文字化け(豆腐表示)する不具合を防ぐため、
+    // 読み込み時に全角へ正規化する(既存データにも自動適用され、
+    // データ移行なしで表示上の不具合が解消される)。
     return CauseAnalysis(
-      why1: map['why1'] as String? ?? '',
-      why2: map['why2'] as String? ?? '',
-      why3: map['why3'] as String? ?? '',
-      why4: map['why4'] as String? ?? '',
-      rootCause: map['rootCause'] as String? ?? '',
+      why1: normalizeHalfWidthKana(map['why1'] as String? ?? ''),
+      why2: normalizeHalfWidthKana(map['why2'] as String? ?? ''),
+      why3: normalizeHalfWidthKana(map['why3'] as String? ?? ''),
+      why4: normalizeHalfWidthKana(map['why4'] as String? ?? ''),
+      rootCause: normalizeHalfWidthKana(map['rootCause'] as String? ?? ''),
       isAiDraft: map['isAiDraft'] as bool? ?? false,
-      editedBy: map['editedBy'] as String? ?? '',
+      editedBy: normalizeHalfWidthKana(map['editedBy'] as String? ?? ''),
     );
   }
 
@@ -212,9 +216,12 @@ class AccidentRecord {
       occurredAt: DateTime.parse(map['occurredAt'] as String),
       fiscalYear: map['fiscalYear'] as int?,
       fiscalMonth: map['fiscalMonth'] as int?,
-      location: map['location'] as String? ?? '',
+      // 半角カタカナの濁点/半濁点による文字化け(豆腐表示)を防ぐため、
+      // 読み込み時に全角へ正規化する(Excel移行データ・既存Firestoreデータにも
+      // 自動適用され、データ移行スクリプトなしで表示不具合が解消される)。
+      location: normalizeHalfWidthKana(map['location'] as String? ?? ''),
       employeeNumber: map['employeeNumber'] as String? ?? '',
-      driverName: map['driverName'] as String? ?? '',
+      driverName: normalizeHalfWidthKana(map['driverName'] as String? ?? ''),
       age: map['age'] as int?,
       yearsOfServiceYear: map['yearsOfServiceYear'] as int?,
       yearsOfServiceMonth: map['yearsOfServiceMonth'] as int?,
@@ -226,8 +233,12 @@ class AccidentRecord {
       ),
       compensationAmount: (map['compensationAmount'] as num?)?.toDouble() ?? 0,
       processingCost: (map['processingCost'] as num?)?.toDouble() ?? 0,
-      counterparty: map['counterparty'] as String? ?? '',
-      description: map['description'] as String? ?? '',
+      counterparty: normalizeHalfWidthKana(
+        map['counterparty'] as String? ?? '',
+      ),
+      description: normalizeHalfWidthKana(
+        map['description'] as String? ?? '',
+      ),
       causeAnalysis: CauseAnalysis.fromMap(map['causeAnalysis'] as Map?),
       // 旧バージョンに存在した「承認済み(approved)」は現バージョンの
       // enumから削除したため、該当データは分析完了済みとして扱う。
