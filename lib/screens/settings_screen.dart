@@ -62,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(
                   controller: _userNameCtrl,
                   decoration: const InputDecoration(
-                    labelText: '管理者名（承認者名として記録されます）',
+                    labelText: '管理者名（原因分析の記録者名として使用されます）',
                   ),
                 ),
               ],

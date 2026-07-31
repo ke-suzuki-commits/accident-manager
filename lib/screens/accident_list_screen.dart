@@ -70,10 +70,12 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                     onChanged: (v) => setState(() => _keyword = v),
                   ),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    height: 36,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
+                  // 高さを固定するとチップ内の文字が縦方向に見切れることがあるため、
+                  // 中身の実際の高さに応じて可変にする(横スクロールのみ固定)。
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Row(
                       children: [
                         _filterDropdownYear(service.availableFiscalYears),
                         const SizedBox(width: 8),
@@ -170,27 +172,66 @@ class _FilterChipDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 「解除」ボタン部分と「選択」ボタン部分でタップ領域を分離する。
+    // Chip+avatarの組み合わせだと、avatar(×アイコン)をタップしても
+    // Chip全体がPopupMenuButtonのタップ領域に含まれてしまい、
+    // メニューが開くだけで選択解除ができない不具合があったため、
+    // 明示的に2つの独立したタップ領域を持つデザインに変更する。
+    final chipContent = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: selected
+            ? AppColors.secondary.withValues(alpha: 0.12)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected
+              ? AppColors.secondary.withValues(alpha: 0.4)
+              : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            selected ? Icons.check_circle_rounded : Icons.filter_list_rounded,
+            size: 15,
+            color: selected ? AppColors.secondary : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 5),
+          // 文字が見切れないよう、内容に応じて幅が伸びるようにする
+          // (固定幅で切ってしまうと選択中のラベルが読めなくなるため)
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.secondary : AppColors.textPrimary,
+            ),
+          ),
+          if (selected) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onClear,
+              behavior: HitTestBehavior.opaque,
+              child: Icon(
+                Icons.close_rounded,
+                size: 15,
+                color: AppColors.secondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
     return PopupMenuButton<T>(
       onSelected: onSelected,
       itemBuilder: (context) => [
         for (final item in items)
           PopupMenuItem<T>(value: item, child: Text(itemLabel(item))),
       ],
-      child: Chip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        avatar: selected
-            ? GestureDetector(
-                onTap: onClear,
-                child: const Icon(Icons.close, size: 16),
-              )
-            : const Icon(Icons.filter_list_rounded, size: 16),
-        backgroundColor: selected
-            ? AppColors.secondary.withValues(alpha: 0.12)
-            : Colors.white,
-        labelStyle: TextStyle(
-          color: selected ? AppColors.secondary : AppColors.textPrimary,
-        ),
-      ),
+      child: chipContent,
     );
   }
 }

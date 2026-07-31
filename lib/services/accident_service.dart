@@ -7,7 +7,9 @@ import '../repositories/accident_repository.dart';
 class AccidentService extends ChangeNotifier {
   final AccidentRepository _repository;
   List<AccidentRecord> _records = [];
-  bool _isLoading = false;
+  // 初期値をtrueにしておくことで、Firestoreからのデータ取得が完了する前の
+  // 一瞬「0件」という誤った空表示がダッシュボード等に出てしまう問題を防ぐ。
+  bool _isLoading = true;
   String? _error;
 
   AccidentService(this._repository);
@@ -140,11 +142,11 @@ class AccidentService extends ChangeNotifier {
     ).where((r) => r.status == RecordStatus.reported).length;
   }
 
-  /// 承認済み件数
-  int approvedCount(int fiscalYear) {
+  /// 原因分析完了件数
+  int analyzedCount(int fiscalYear) {
     return byFiscalYear(
       fiscalYear,
-    ).where((r) => r.status == RecordStatus.approved).length;
+    ).where((r) => r.status == RecordStatus.analyzed).length;
   }
 
   /// 年度別総額

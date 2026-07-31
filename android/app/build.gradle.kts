@@ -1,3 +1,7 @@
+// ✅ CRITICAL: Required imports for signing configuration
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")

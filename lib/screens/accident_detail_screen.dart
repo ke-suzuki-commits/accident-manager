@@ -128,17 +128,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
     }
   }
 
-  Future<void> _approve() async {
-    final updated = _record.copyWith(status: RecordStatus.approved);
-    await context.read<AccidentService>().updateRecord(updated);
-    setState(() => _record = updated);
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('承認済みに更新しました')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final r = _record;
@@ -236,16 +225,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                   ),
                 ),
               ),
-              const Spacer(),
-              if (r.status != RecordStatus.approved)
-                TextButton.icon(
-                  onPressed: _approve,
-                  icon: const Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 18,
-                  ),
-                  label: const Text('承認する'),
-                ),
             ],
           ),
           const SizedBox(height: 12),

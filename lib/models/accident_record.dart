@@ -228,9 +228,11 @@ class AccidentRecord {
       counterparty: map['counterparty'] as String? ?? '',
       description: map['description'] as String? ?? '',
       causeAnalysis: CauseAnalysis.fromMap(map['causeAnalysis'] as Map?),
+      // 旧バージョンに存在した「承認済み(approved)」は現バージョンの
+      // enumから削除したため、該当データは分析完了済みとして扱う。
       status: RecordStatus.values.firstWhere(
         (e) => e.name == map['status'],
-        orElse: () => RecordStatus.reported,
+        orElse: () => RecordStatus.analyzed,
       ),
       photoUrls: (map['photoUrls'] as List?)?.cast<String>() ?? const [],
       isMigrated: map['isMigrated'] as bool? ?? false,

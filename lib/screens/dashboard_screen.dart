@@ -36,7 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final records = service.byFiscalYear(selectedYear);
         final monthly = service.monthlyCountByFiscalYear(selectedYear);
         final uncompleted = service.uncompletedAnalysisCount(selectedYear);
-        final approved = service.approvedCount(selectedYear);
+        final analyzed = service.analyzedCount(selectedYear);
         final typeBreakdown = service.typeBreakdown(selectedYear);
 
         final isDesktop = MediaQuery.of(context).size.width >= 900;
@@ -56,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildStatCards(
                     records.length,
                     uncompleted,
-                    approved,
+                    analyzed,
                     isDesktop,
                   ),
                   const SizedBox(height: 24),
@@ -158,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStatCards(
     int total,
     int uncompleted,
-    int approved,
+    int analyzed,
     bool isDesktop,
   ) {
     final cards = [
@@ -175,8 +175,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: AppColors.cardYellow,
       ),
       StatCard(
-        label: '承認済み',
-        value: '$approved件',
+        label: '分析完了',
+        value: '$analyzed件',
         icon: Icons.verified_rounded,
         color: AppColors.cardPurple,
       ),

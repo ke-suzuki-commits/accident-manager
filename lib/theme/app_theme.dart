@@ -59,8 +59,6 @@ class AppColors {
       case RecordStatus.reported:
         return warning;
       case RecordStatus.analyzed:
-        return primary;
-      case RecordStatus.approved:
         return success;
     }
   }

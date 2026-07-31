@@ -71,11 +71,11 @@ enum PartsAccidentCause {
   }
 }
 
-/// 進捗ステータス（速報登録 → 原因分析完了 → 承認）
+/// 進捗ステータス（速報登録 → 原因分析完了）
+/// ※承認フローは本アプリのスコープ外のため廃止(2段階管理に変更)
 enum RecordStatus {
   reported('速報登録'),
-  analyzed('原因分析完了'),
-  approved('承認済み');
+  analyzed('原因分析完了');
 
   final String label;
   const RecordStatus(this.label);
@@ -83,7 +83,9 @@ enum RecordStatus {
   static RecordStatus fromLabel(String label) {
     return RecordStatus.values.firstWhere(
       (e) => e.label == label,
-      orElse: () => RecordStatus.reported,
+      // 過去データに残っている旧ステータス「承認済み」は
+      // 「原因分析完了」として扱う(データ移行時の後方互換)。
+      orElse: () => RecordStatus.analyzed,
     );
   }
 }
