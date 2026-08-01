@@ -6,11 +6,13 @@ import '../theme/app_theme.dart';
 class AccidentListTile extends StatelessWidget {
   final AccidentRecord record;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
 
   const AccidentListTile({
     super.key,
     required this.record,
     required this.onTap,
+    this.onEdit,
   });
 
   @override
@@ -139,14 +141,41 @@ class AccidentListTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: AppColors.forStatus(record.status),
-                        shape: BoxShape.circle,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: AppColors.forStatus(record.status),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        if (onEdit != null) ...[
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: onEdit,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.12,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.edit_rounded,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(

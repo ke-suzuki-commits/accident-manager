@@ -5,6 +5,7 @@ import '../services/accident_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/accident_list_tile.dart';
 import 'accident_detail_screen.dart';
+import 'accident_form_screen.dart';
 
 class AccidentListScreen extends StatefulWidget {
   const AccidentListScreen({super.key});
@@ -113,6 +114,12 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => AccidentDetailScreen(record: r),
+                            ),
+                          ),
+                          onEdit: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => AccidentFormScreen(existing: r),
                             ),
                           ),
                         );
