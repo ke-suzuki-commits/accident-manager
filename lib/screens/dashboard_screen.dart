@@ -35,6 +35,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final records = service.byFiscalYear(selectedYear);
         final monthly = service.monthlyCountByFiscalYear(selectedYear);
+        final charterMonthly =
+            service.charterVsOwnMonthlyComparison(selectedYear)[true] ??
+            const {};
         final uncompleted = service.uncompletedAnalysisCount(selectedYear);
         final analyzed = service.analyzedCount(selectedYear);
         final typeBreakdown = service.typeBreakdown(selectedYear);
@@ -62,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 24),
                   _sectionTitle('月別事故発生件数'),
                   const SizedBox(height: 12),
-                  _buildMonthlyChart(monthly),
+                  _buildMonthlyChart(monthly, charterMonthly),
                   const SizedBox(height: 24),
                   _sectionTitle('発生区分の内訳'),
                   const SizedBox(height: 12),
@@ -176,9 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       '$year年度',
                       style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : AppColors.textPrimary,
+                        color: selected ? Colors.white : AppColors.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -238,7 +239,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMonthlyChart(Map<int, int> monthly) {
+  // 月別事故発生件数の棒グラフ。
+  // ※以前はタップ/クリックしないと件数(ツールチップ)が表示されない仕様だった。
+  //   常時、件数と庸車件数の内訳を表示してほしいという要望に対応するため、
+  //   fl_chartのshowingTooltipIndicatorsを使い、タッチ操作なしで
+  //   全バーの上に常時ラベルを表示する方式に変更する。
+  Widget _buildMonthlyChart(
+    Map<int, int> monthly,
+    Map<int, int> charterMonthly,
+  ) {
     final months = monthly.keys.toList();
     final maxY =
         (monthly.values.isEmpty
@@ -246,69 +255,134 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : monthly.values.reduce((a, b) => a > b ? a : b))
             .toDouble();
 
+    // 1ヶ月あたりに確保する横幅。常時ラベル(件数＋庸車内訳)が隣月と
+    // 重ならないよう、バー幅より広めに固定スロット幅を確保する。
+    // 画面幅が狭い場合は横スクロールで全12ヶ月分を閲覧できるようにする。
+    const slotWidth = 58.0;
+
     return Container(
-      height: 220,
-      padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+      height: 260,
+      padding: const EdgeInsets.fromLTRB(8, 40, 16, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: BarChart(
-        BarChartData(
-          maxY: maxY < 4 ? 4 : maxY + 1,
-          barTouchData: BarTouchData(enabled: true),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final idx = value.toInt();
-                  if (idx < 0 || idx >= months.length) return const SizedBox();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      '${months[idx]}月',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-          barGroups: [
-            for (int i = 0; i < months.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: (monthly[months[i]] ?? 0).toDouble(),
-                    color: AppColors.primary,
-                    width: 14,
-                    borderRadius: BorderRadius.circular(6),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final chartWidth = constraints.maxWidth > slotWidth * months.length
+              ? constraints.maxWidth
+              : slotWidth * months.length;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: SizedBox(
+              width: chartWidth,
+              child: BarChart(
+                BarChartData(
+                  // 常時ラベル表示のため、上部に余白を多めに確保する。
+                  maxY: (maxY < 4 ? 4 : maxY + 1) * 1.35,
+                  // タップ操作は不要になったため無効化し、常時表示ラベルのみを使う。
+                  barTouchData: BarTouchData(
+                    enabled: false,
+                    handleBuiltInTouches: false,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => Colors.transparent,
+                      tooltipPadding: EdgeInsets.zero,
+                      tooltipMargin: 4,
+                      fitInsideVertically: true,
+                      fitInsideHorizontally: true,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final month = months[groupIndex];
+                        final total = monthly[month] ?? 0;
+                        if (total == 0) return null;
+                        final charter = charterMonthly[month] ?? 0;
+                        return BarTooltipItem(
+                          '$total件',
+                          const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            height: 1.3,
+                          ),
+                          textAlign: TextAlign.center,
+                          children: [
+                            TextSpan(
+                              text: '\n(庸車$charter件)',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-                ],
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= months.length)
+                            return const SizedBox();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              '${months[idx]}月',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(show: false),
+                  barGroups: [
+                    for (int i = 0; i < months.length; i++)
+                      BarChartGroupData(
+                        x: i,
+                        // 件数が0件の月はラベルを出さず、バーの見た目のみとする。
+                        showingTooltipIndicators: (monthly[months[i]] ?? 0) > 0
+                            ? [0]
+                            : [],
+                        barRods: [
+                          BarChartRodData(
+                            toY: (monthly[months[i]] ?? 0).toDouble(),
+                            color: AppColors.primary,
+                            width: 14,
+                            borderRadius: BorderRadius.circular(6),
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.gradientStart,
+                                AppColors.gradientEnd,
+                              ],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }
