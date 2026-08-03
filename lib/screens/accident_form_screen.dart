@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
 import '../services/accident_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/kana_normalize.dart';
 
@@ -107,7 +108,11 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final service = context.read<AccidentService>();
+    final auth = context.read<AuthService>();
     final existing = widget.existing;
+    final editorUid = auth.firebaseUser?.uid ?? '';
+    final editorName = auth.currentUser?.name ?? '不明';
+    final editorEmail = auth.currentUser?.email ?? '';
 
     final record = AccidentRecord(
       id: existing?.id,
@@ -137,13 +142,23 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       causeAnalysis: existing?.causeAnalysis,
       status: existing?.status ?? RecordStatus.reported,
       isMigrated: existing?.isMigrated ?? false,
-      createdBy: existing?.createdBy ?? '',
+      createdBy: existing?.createdBy ?? editorName,
     );
 
     if (_isEdit) {
-      await service.updateRecord(record);
+      await service.updateRecord(
+        record,
+        editorUid: editorUid,
+        editorName: editorName,
+        editorEmail: editorEmail,
+      );
     } else {
-      await service.addRecord(record);
+      await service.addRecord(
+        record,
+        editorUid: editorUid,
+        editorName: editorName,
+        editorEmail: editorEmail,
+      );
     }
 
     if (mounted) Navigator.pop(context, record);

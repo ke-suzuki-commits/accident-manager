@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
+import '../models/accident_record.dart';
 import '../services/accident_service.dart';
+import '../services/accident_target_service.dart';
+import '../services/insight_engine.dart';
 import '../theme/app_theme.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -46,6 +49,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 14),
                 _buildYearMultiSelect(years),
+                const SizedBox(height: 24),
+                _sectionTitle('AIによる傾向分析'),
+                const SizedBox(height: 12),
+                _buildInsightSection(service),
+                const SizedBox(height: 24),
+                _sectionTitle('前年度同月比較'),
+                const SizedBox(height: 12),
+                _buildSameMonthComparison(service),
                 const SizedBox(height: 24),
                 _sectionTitle('年度別 月次推移比較'),
                 const SizedBox(height: 12),
@@ -112,6 +123,239 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             }),
           ),
       ],
+    );
+  }
+
+  /// AIによる傾向分析(ルールベース統計エンジン)。当年度を基準に分析する。
+  Widget _buildInsightSection(AccidentService service) {
+    final years = service.availableFiscalYears;
+    final currentYear = years.isNotEmpty
+        ? years.first
+        : AccidentRecord.calcFiscalYear(DateTime.now());
+    return Consumer<AccidentTargetService>(
+      builder: (context, targetService, _) {
+        if (targetService.isLoading) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        final insights = InsightEngine.analyze(
+          accidentService: service,
+          targetService: targetService,
+          fiscalYear: currentYear,
+        );
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 18,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$currentYear年度の分析コメント',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '蓄積データを集計・比較し、統計的な気づきを自動生成しています。',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              for (final item in insights) _insightTile(item),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _insightTile(InsightItem item) {
+    late final Color color;
+    late final IconData icon;
+    switch (item.severity) {
+      case InsightSeverity.positive:
+        color = AppColors.success;
+        icon = Icons.trending_down_rounded;
+        break;
+      case InsightSeverity.info:
+        color = AppColors.secondary;
+        icon = Icons.info_outline_rounded;
+        break;
+      case InsightSeverity.warning:
+        color = AppColors.warning;
+        icon = Icons.warning_amber_rounded;
+        break;
+      case InsightSeverity.danger:
+        color = AppColors.danger;
+        icon = Icons.error_outline_rounded;
+        break;
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.message,
+                  style: const TextStyle(fontSize: 12, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 前年度同月比較(当月時点で前年度の同じ月と件数を比較する)。
+  Widget _buildSameMonthComparison(AccidentService service) {
+    final years = service.availableFiscalYears;
+    final currentYear = years.isNotEmpty
+        ? years.first
+        : AccidentRecord.calcFiscalYear(DateTime.now());
+    final now = DateTime.now();
+    final targetMonth = now.month;
+    final result = service.sameMonthYearOverYear(currentYear, targetMonth);
+    final diff = result.current - result.previous;
+    Color diffColor;
+    String diffLabel;
+    if (diff > 0) {
+      diffColor = AppColors.danger;
+      diffLabel = '+$diff件（前年同月より増加）';
+    } else if (diff < 0) {
+      diffColor = AppColors.success;
+      diffLabel = '${-diff}件（前年同月より減少）';
+    } else {
+      diffColor = AppColors.textSecondary;
+      diffLabel = '前年同月と同数';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$targetMonth月の実績比較（$currentYear年度 vs ${currentYear - 1}年度）',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _monthCompareCard(
+                  label: '$currentYear年度 $targetMonth月',
+                  count: result.current,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _monthCompareCard(
+                  label: '${currentYear - 1}年度 $targetMonth月',
+                  count: result.previous,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            decoration: BoxDecoration(
+              color: diffColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              diffLabel,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, color: diffColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthCompareCard({
+    required String label,
+    required int count,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$count件',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
@@ -469,7 +713,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           Text(
             '全体の${pct.toStringAsFixed(1)}%',
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -493,7 +740,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
     double maxY = 4;
     for (final m in months) {
-      if (charterMonthly[m]!.toDouble() > maxY) maxY = charterMonthly[m]!.toDouble();
+      if (charterMonthly[m]!.toDouble() > maxY)
+        maxY = charterMonthly[m]!.toDouble();
       if (ownMonthly[m]!.toDouble() > maxY) maxY = ownMonthly[m]!.toDouble();
     }
 
@@ -565,7 +813,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final merged = <Team, int>{};
     for (final y in selectedYearsList) {
-      service.teamBreakdown(y).forEach((k, v) => merged[k] = (merged[k] ?? 0) + v);
+      service
+          .teamBreakdown(y)
+          .forEach((k, v) => merged[k] = (merged[k] ?? 0) + v);
     }
     // 「未設定」は班未入力の過去データ用。集計上は表示するが末尾に回す。
     final teams = Team.values.where((t) => t != Team.unassigned).toList();
@@ -776,11 +1026,7 @@ class _YearFilterChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (selected) ...[
-                const Icon(
-                  Icons.check_rounded,
-                  size: 15,
-                  color: Colors.white,
-                ),
+                const Icon(Icons.check_rounded, size: 15, color: Colors.white),
                 const SizedBox(width: 4),
               ],
               Text(

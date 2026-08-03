@@ -236,9 +236,7 @@ class AccidentRecord {
       counterparty: normalizeHalfWidthKana(
         map['counterparty'] as String? ?? '',
       ),
-      description: normalizeHalfWidthKana(
-        map['description'] as String? ?? '',
-      ),
+      description: normalizeHalfWidthKana(map['description'] as String? ?? ''),
       causeAnalysis: CauseAnalysis.fromMap(map['causeAnalysis'] as Map?),
       // 旧バージョンに存在した「承認済み(approved)」は現バージョンの
       // enumから削除したため、該当データは分析完了済みとして扱う。

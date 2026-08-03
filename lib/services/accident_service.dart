@@ -1,18 +1,22 @@
 import 'package:flutter/foundation.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
+import '../models/edit_log.dart';
 import '../repositories/accident_repository.dart';
+import 'edit_log_service.dart';
 
 /// 事故記録の状態管理サービス（Provider経由でアプリ全体から利用）
 class AccidentService extends ChangeNotifier {
   final AccidentRepository _repository;
+  final EditLogService _editLogService;
   List<AccidentRecord> _records = [];
   // 初期値をtrueにしておくことで、Firestoreからのデータ取得が完了する前の
   // 一瞬「0件」という誤った空表示がダッシュボード等に出てしまう問題を防ぐ。
   bool _isLoading = true;
   String? _error;
 
-  AccidentService(this._repository);
+  AccidentService(this._repository, {EditLogService? editLogService})
+    : _editLogService = editLogService ?? EditLogService();
 
   List<AccidentRecord> get records => List.unmodifiable(_records);
   bool get isLoading => _isLoading;
@@ -33,12 +37,29 @@ class AccidentService extends ChangeNotifier {
     }
   }
 
-  Future<void> addRecord(AccidentRecord record) async {
+  Future<void> addRecord(
+    AccidentRecord record, {
+    required String editorUid,
+    required String editorName,
+    required String editorEmail,
+  }) async {
     try {
       await _repository.save(record);
       _records.insert(0, record);
       _records.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
       notifyListeners();
+      // 証跡ログの記録失敗で本体保存まで失敗扱いにしないよう、
+      // ログ書き込みは独立したtry-catchで囲む。
+      try {
+        await _editLogService.logCreate(
+          record: record,
+          editorUid: editorUid,
+          editorName: editorName,
+          editorEmail: editorEmail,
+        );
+      } catch (_) {
+        // ログ記録の失敗は業務継続を優先し無視する(コンソールにのみ影響が残る)。
+      }
     } catch (e) {
       _error = '保存に失敗しました: $e';
       notifyListeners();
@@ -46,14 +67,33 @@ class AccidentService extends ChangeNotifier {
     }
   }
 
-  Future<void> updateRecord(AccidentRecord record) async {
+  Future<void> updateRecord(
+    AccidentRecord record, {
+    required String editorUid,
+    required String editorName,
+    required String editorEmail,
+  }) async {
     try {
-      await _repository.save(record);
       final idx = _records.indexWhere((r) => r.id == record.id);
+      final before = idx != -1 ? _records[idx] : null;
+      await _repository.save(record);
       if (idx != -1) {
         _records[idx] = record;
       }
       notifyListeners();
+      if (before != null) {
+        try {
+          await _editLogService.logUpdate(
+            before: before,
+            after: record,
+            editorUid: editorUid,
+            editorName: editorName,
+            editorEmail: editorEmail,
+          );
+        } catch (_) {
+          // ログ記録の失敗は業務継続を優先し無視する。
+        }
+      }
     } catch (e) {
       _error = '更新に失敗しました: $e';
       notifyListeners();
@@ -61,16 +101,40 @@ class AccidentService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteRecord(String id) async {
+  Future<void> deleteRecord(
+    String id, {
+    required String editorUid,
+    required String editorName,
+    required String editorEmail,
+  }) async {
     try {
+      final idx = _records.indexWhere((r) => r.id == id);
+      final record = idx != -1 ? _records[idx] : null;
       await _repository.delete(id);
       _records.removeWhere((r) => r.id == id);
       notifyListeners();
+      if (record != null) {
+        try {
+          await _editLogService.logDelete(
+            record: record,
+            editorUid: editorUid,
+            editorName: editorName,
+            editorEmail: editorEmail,
+          );
+        } catch (_) {
+          // ログ記録の失敗は業務継続を優先し無視する。
+        }
+      }
     } catch (e) {
       _error = '削除に失敗しました: $e';
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// 指定した事故記録の編集履歴(証跡)を新しい順で取得する。
+  Future<List<EditLog>> getEditLogs(String recordId) {
+    return _editLogService.getLogsForRecord(recordId);
   }
 
   Future<void> importRecords(List<AccidentRecord> newRecords) async {
@@ -152,10 +216,9 @@ class AccidentService extends ChangeNotifier {
   /// 年度別総額（賠償金額＋事故処理諸費用の合計）
   /// ※　以前の「金額」入力欄は廃止したため、実際に入力される2項目で集計する。
   double totalAmount(int fiscalYear) {
-    return byFiscalYear(fiscalYear).fold(
-      0,
-      (sum, r) => sum + r.compensationAmount + r.processingCost,
-    );
+    return byFiscalYear(
+      fiscalYear,
+    ).fold(0, (sum, r) => sum + r.compensationAmount + r.processingCost);
   }
 
   /// 班別件数（小集団活動の月次集計用）
@@ -206,5 +269,29 @@ class AccidentService extends ChangeNotifier {
   /// 年度比較用: 複数年度の月別件数
   Map<int, Map<int, int>> multiYearMonthlyComparison(List<int> fiscalYears) {
     return {for (final fy in fiscalYears) fy: monthlyCountByFiscalYear(fy)};
+  }
+
+  /// 前年度同月比較。指定年度の指定月(fiscalMonth: 1-12)における件数と、
+  /// 前年度同月の件数を返す。
+  ({int current, int previous}) sameMonthYearOverYear(
+    int fiscalYear,
+    int fiscalMonth,
+  ) {
+    final current = byFiscalYear(
+      fiscalYear,
+    ).where((r) => r.fiscalMonth == fiscalMonth).length;
+    final previous = byFiscalYear(
+      fiscalYear - 1,
+    ).where((r) => r.fiscalMonth == fiscalMonth).length;
+    return (current: current, previous: previous);
+  }
+
+  /// 前年度との月別件数の並列比較(4月〜3月の順)。
+  /// 戻り値: {true: 当年度の月別件数, false: 前年度の月別件数}
+  Map<bool, Map<int, int>> yearOverYearMonthlyComparison(int fiscalYear) {
+    return {
+      true: monthlyCountByFiscalYear(fiscalYear),
+      false: monthlyCountByFiscalYear(fiscalYear - 1),
+    };
   }
 }

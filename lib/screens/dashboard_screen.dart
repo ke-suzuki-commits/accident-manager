@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
+import '../models/accident_target.dart';
 import '../services/accident_service.dart';
+import '../services/accident_target_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/accident_list_tile.dart';
@@ -63,6 +65,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     isDesktop,
                   ),
                   const SizedBox(height: 24),
+                  _buildTargetProgressSection(selectedYear, records.length),
+                  const SizedBox(height: 24),
                   _sectionTitle('月別事故発生件数'),
                   const SizedBox(height: 12),
                   _buildMonthlyChart(monthly, charterMonthly),
@@ -106,6 +110,163 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// 全社・班別の年度事故目標に対する進捗モニター(件数・パーセンテージ)。
+  Widget _buildTargetProgressSection(int fiscalYear, int currentCount) {
+    return Consumer<AccidentTargetService>(
+      builder: (context, targetService, _) {
+        if (targetService.isLoading) {
+          return const SizedBox();
+        }
+        final companyTarget = targetService.companyTarget(fiscalYear);
+        final teamTargets = targetService.teamTargetsForYear(fiscalYear)
+          ..sort((a, b) => a.scope.compareTo(b.scope));
+
+        if (companyTarget == null && teamTargets.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.flag_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$fiscalYear年度の事故目標が未設定です。設定画面(管理者)から登録できます。',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '年度事故目標の進捗',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const SizedBox(height: 14),
+              if (companyTarget != null)
+                _targetProgressRow(
+                  label: '全社',
+                  current: currentCount,
+                  target: companyTarget.targetCount,
+                ),
+              for (final t in teamTargets)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: _targetProgressRow(
+                    label: Team.values
+                        .firstWhere(
+                          (team) => team.name == t.scope,
+                          orElse: () => Team.unassigned,
+                        )
+                        .label,
+                    current: context
+                        .read<AccidentService>()
+                        .byFiscalYear(fiscalYear)
+                        .where((r) => TargetScope.forTeam(r.team) == t.scope)
+                        .length,
+                    target: t.targetCount,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _targetProgressRow({
+    required String label,
+    required int current,
+    required int target,
+  }) {
+    if (target <= 0) return const SizedBox();
+    final ratio = (current / target).clamp(0.0, 1.5);
+    final pct = (current / target * 100);
+    Color color;
+    if (ratio < 0.7) {
+      color = AppColors.success;
+    } else if (ratio < 1.0) {
+      color = AppColors.warning;
+    } else {
+      color = AppColors.danger;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 56,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: ratio > 1.0 ? 1.0 : ratio,
+                  minHeight: 10,
+                  backgroundColor: AppColors.background,
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 92,
+              child: Text(
+                '$current / $target件',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 66, top: 2),
+          child: Text(
+            '${pct.toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

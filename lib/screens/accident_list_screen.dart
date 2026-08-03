@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../services/accident_service.dart';
 import '../theme/app_theme.dart';
+import '../services/auth_service.dart';
 import '../widgets/accident_list_tile.dart';
 import 'accident_detail_screen.dart';
 import 'accident_form_screen.dart';
@@ -25,6 +26,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
   Widget build(BuildContext context) {
     return Consumer<AccidentService>(
       builder: (context, service, _) {
+        final canEdit = context.watch<AuthService>().canEdit;
         var records = service.records;
 
         if (_yearFilter != null) {
@@ -116,12 +118,15 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                               builder: (_) => AccidentDetailScreen(record: r),
                             ),
                           ),
-                          onEdit: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AccidentFormScreen(existing: r),
-                            ),
-                          ),
+                          onEdit: canEdit
+                              ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AccidentFormScreen(existing: r),
+                                  ),
+                                )
+                              : null,
                         );
                       },
                     ),

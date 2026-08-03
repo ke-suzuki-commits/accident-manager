@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
+import 'employee_management_screen.dart';
+import 'login_screen.dart';
+import 'target_setting_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -44,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 900;
+    final auth = context.watch<AuthService>();
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 28 : 16),
       child: ConstrainedBox(
@@ -56,6 +61,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+            _accountCard(context, auth),
+            const SizedBox(height: 16),
+            if (auth.isAdmin) ...[
+              _card(
+                title: '管理者メニュー',
+                children: [
+                  _menuTile(
+                    context,
+                    icon: Icons.people_alt_rounded,
+                    label: '社員アカウント管理',
+                    subtitle: '権限の付与・社員の追加',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EmployeeManagementScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  _menuTile(
+                    context,
+                    icon: Icons.flag_rounded,
+                    label: '年度事故目標の設定',
+                    subtitle: '全社・班別の目標件数',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TargetSettingScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
             _card(
               title: 'ユーザー情報',
               children: [
@@ -161,6 +201,236 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ...children,
         ],
       ),
+    );
+  }
+
+  Widget _accountCard(BuildContext context, AuthService auth) {
+    final user = auth.currentUser;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.secondary.withValues(alpha: 0.12),
+                child: Text(
+                  (user?.name.isNotEmpty ?? false)
+                      ? user!.name.substring(0, 1)
+                      : '?',
+                  style: const TextStyle(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.name ?? '(不明なユーザー)',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      user?.email ?? '',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  auth.role.label,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showChangePasswordDialog(context),
+                  icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                  label: const Text('パスワード変更'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await context.read<AuthService>().signOut();
+                    if (context.mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: AppColors.danger,
+                  ),
+                  label: const Text(
+                    'ログアウト',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.secondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.textSecondary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showChangePasswordDialog(BuildContext context) async {
+    final auth = context.read<AuthService>();
+    final ctrl = TextEditingController();
+    bool isSubmitting = false;
+    String? errorMessage;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('パスワード変更'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: ctrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: '新しいパスワード(6文字以上)',
+                    ),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('キャンセル'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (ctrl.text.length < 6) {
+                            setState(() => errorMessage = '6文字以上で入力してください');
+                            return;
+                          }
+                          setState(() {
+                            isSubmitting = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await auth.changePassword(ctrl.text);
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('パスワードを変更しました')),
+                              );
+                            }
+                          } catch (e) {
+                            setState(() {
+                              errorMessage = '$e';
+                              isSubmitting = false;
+                            });
+                          }
+                        },
+                  child: const Text('変更する'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

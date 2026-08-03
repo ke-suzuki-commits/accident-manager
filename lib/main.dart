@@ -8,9 +8,11 @@ import 'firebase_options.dart';
 import 'repositories/accident_repository.dart';
 import 'repositories/firestore_accident_repository.dart';
 import 'services/accident_service.dart';
+import 'services/accident_target_service.dart';
+import 'services/auth_service.dart';
 import 'services/settings_service.dart';
 import 'theme/app_theme.dart';
-import 'screens/home_screen.dart';
+import 'widgets/auth_gate.dart';
 
 /// Firebase接続に成功したかどうか。
 /// 成功時はFirestore(クラウド共有)、失敗時はHive(ローカル保存)を使う。
@@ -66,6 +68,8 @@ class MyApp extends StatelessWidget {
                 : HiveAccidentRepository(),
           ),
         ),
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => AccidentTargetService()),
         ChangeNotifierProvider.value(value: settingsService),
       ],
       child: MaterialApp(
@@ -81,7 +85,7 @@ class MyApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: const HomeScreen(),
+        home: const AuthGate(),
       ),
     );
   }

@@ -3,8 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
+import '../models/edit_log.dart';
 import '../services/accident_service.dart';
 import '../services/ai_analysis_service.dart';
+import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/kana_normalize.dart';
@@ -108,6 +110,11 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   }
 
   Future<void> _saveAnalysis({required bool editedManually}) async {
+    final auth = context.read<AuthService>();
+    // 記録者名は、認証ユーザーの氏名を優先し、未取得の場合のみ
+    // 設定画面の手入力名(userName)にフォールバックする。
+    final editorName =
+        auth.currentUser?.name ?? context.read<SettingsService>().userName;
     final updated = _record.copyWith(
       causeAnalysis: _record.causeAnalysis.copyWith(
         // 半角カタカナの濁点/半濁点による文字化けを防ぐため正規化する。
@@ -117,11 +124,16 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
         why4: normalizeHalfWidthKana(_why4Ctrl.text),
         rootCause: normalizeHalfWidthKana(_rootCauseCtrl.text),
         isAiDraft: !editedManually && _record.causeAnalysis.isAiDraft,
-        editedBy: context.read<SettingsService>().userName,
+        editedBy: editorName,
       ),
       status: RecordStatus.analyzed,
     );
-    await context.read<AccidentService>().updateRecord(updated);
+    await context.read<AccidentService>().updateRecord(
+      updated,
+      editorUid: auth.firebaseUser?.uid ?? '',
+      editorName: editorName,
+      editorEmail: auth.currentUser?.email ?? '',
+    );
     setState(() => _record = updated);
     if (mounted) {
       ScaffoldMessenger.of(
@@ -137,6 +149,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       'yyyy年MM月dd日(E) HH:mm',
       'ja_JP',
     ).format(r.occurredAt);
+    final canEdit = context.watch<AuthService>().canEdit;
 
     return Scaffold(
       appBar: AppBar(
@@ -145,18 +158,19 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
         ),
         title: const Text('事故詳細'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_rounded),
-            onPressed: () async {
-              final updated = await Navigator.push<AccidentRecord>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AccidentFormScreen(existing: r),
-                ),
-              );
-              if (updated != null) setState(() => _record = updated);
-            },
-          ),
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_rounded),
+              onPressed: () async {
+                final updated = await Navigator.push<AccidentRecord>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AccidentFormScreen(existing: r),
+                  ),
+                );
+                if (updated != null) setState(() => _record = updated);
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -170,7 +184,9 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               const SizedBox(height: 16),
               _buildInfoSection(r),
               const SizedBox(height: 16),
-              _buildCauseAnalysisSection(),
+              _buildCauseAnalysisSection(canEdit),
+              const SizedBox(height: 16),
+              _buildEditHistorySection(r),
               const SizedBox(height: 24),
             ],
           ),
@@ -338,7 +354,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
 
   String _formatNumber(double v) => NumberFormat('#,###').format(v);
 
-  Widget _buildCauseAnalysisSection() {
+  Widget _buildCauseAnalysisSection(bool canEdit) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -356,22 +372,31 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: _isGenerating ? null : _generateAiDraft,
-                icon: _isGenerating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.auto_awesome_rounded, size: 18),
-                label: Text(_isGenerating ? '生成中...' : 'AIでドラフト生成'),
-              ),
+              if (canEdit)
+                ElevatedButton.icon(
+                  onPressed: _isGenerating ? null : _generateAiDraft,
+                  icon: _isGenerating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.auto_awesome_rounded, size: 18),
+                  label: Text(_isGenerating ? '生成中...' : 'AIでドラフト生成'),
+                ),
             ],
           ),
+          if (!canEdit)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                '※閲覧権限のため編集できません。',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ),
           if (_record.causeAnalysis.isAiDraft)
             const Padding(
               padding: EdgeInsets.only(top: 6),
@@ -381,10 +406,10 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               ),
             ),
           const SizedBox(height: 14),
-          _whyField('Why① なぜ発生したか', _why1Ctrl),
-          _whyField('Why② why①に対してなぜ', _why2Ctrl),
-          _whyField('Why③ why②に対してなぜ', _why3Ctrl),
-          _whyField('Why④ why③に対してなぜ', _why4Ctrl),
+          _whyField('Why① なぜ発生したか', _why1Ctrl, canEdit),
+          _whyField('Why② why①に対してなぜ', _why2Ctrl, canEdit),
+          _whyField('Why③ why②に対してなぜ', _why3Ctrl, canEdit),
+          _whyField('Why④ why③に対してなぜ', _why4Ctrl, canEdit),
           const SizedBox(height: 8),
           const Text(
             '真因（最終結論）',
@@ -398,22 +423,189 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
           TextField(
             controller: _rootCauseCtrl,
             maxLines: 3,
+            enabled: canEdit,
             decoration: const InputDecoration(hintText: '真因を入力...'),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => _saveAnalysis(editedManually: true),
-              child: const Text('原因分析を保存'),
+          if (canEdit)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _saveAnalysis(editedManually: true),
+                child: const Text('原因分析を保存'),
+              ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditHistorySection(AccidentRecord r) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(width: 6),
+              Text(
+                '編集履歴（証跡）',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<List<EditLog>>(
+            future: context.read<AccidentService>().getEditLogs(r.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              final logs = snapshot.data ?? [];
+              if (logs.isEmpty) {
+                return const Text(
+                  '編集履歴はありません。',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [for (final log in logs) _editLogTile(log)],
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _whyField(String label, TextEditingController ctrl) {
+  Widget _editLogTile(EditLog log) {
+    final dateStr = DateFormat('yyyy/MM/dd HH:mm').format(log.timestamp);
+    Color badgeColor;
+    switch (log.action) {
+      case EditAction.create:
+        badgeColor = AppColors.success;
+        break;
+      case EditAction.update:
+        badgeColor = AppColors.secondary;
+        break;
+      case EditAction.delete:
+        badgeColor = AppColors.danger;
+        break;
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  log.action.label,
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${log.editorName}（${log.editorEmail}）',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                dateStr,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (log.changes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            for (final c in log.changes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${c.fieldLabel}: ',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(
+                        text: c.oldValue,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.danger,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                      const TextSpan(text: '  →  '),
+                      TextSpan(
+                        text: c.newValue,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _whyField(String label, TextEditingController ctrl, bool canEdit) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -431,6 +623,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
           TextField(
             controller: ctrl,
             maxLines: 2,
+            enabled: canEdit,
             decoration: const InputDecoration(hintText: '入力...'),
           ),
         ],

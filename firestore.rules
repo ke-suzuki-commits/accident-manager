@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'admin';
+    }
+
+    function isEditorOrAdmin() {
+      return isSignedIn() && (userRole() == 'editor' || userRole() == 'admin');
+    }
+
+    // 社員アカウント情報(閲覧は全員可、追加・変更・削除は管理者のみ)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin();
+      // 自分自身のアカウントは削除できないようにする
+      allow delete: if isAdmin() && request.auth.uid != userId;
+    }
+
+    // 事故記録(閲覧は全員可、編集・削除は編集者/管理者のみ)
+    match /accident_records/{recordId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isEditorOrAdmin();
+    }
+
+    // 証跡ログ(改ざん防止のため追記専用。update/deleteはクライアントから一切禁止)
+    match /edit_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isEditorOrAdmin();
+      allow update, delete: if false;
+    }
+
+    // 年度事故目標(閲覧は全員可、設定は管理者のみ)
+    match /accident_targets/{targetId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
