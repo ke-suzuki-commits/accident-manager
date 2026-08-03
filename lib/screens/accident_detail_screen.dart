@@ -422,7 +422,12 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
           const SizedBox(height: 6),
           TextField(
             controller: _rootCauseCtrl,
-            maxLines: 3,
+            // スマホ等の狭い画面では同じ文章でも折り返し行数が増えるため、
+            // 固定行数だと文字が見切れる。minLines/maxLinesをnullにし、
+            // 内容量に応じて入力欄の高さが自動的に伸びるようにする。
+            minLines: 3,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
             enabled: canEdit,
             decoration: const InputDecoration(hintText: '真因を入力...'),
           ),
@@ -622,7 +627,12 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
           const SizedBox(height: 6),
           TextField(
             controller: ctrl,
-            maxLines: 2,
+            // スマホ等の狭い画面では同じ文章でも折り返し行数が増えるため、
+            // 固定行数だと文字が見切れる。minLines/maxLinesをnullにし、
+            // 内容量に応じて入力欄の高さが自動的に伸びるようにする。
+            minLines: 2,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
             enabled: canEdit,
             decoration: const InputDecoration(hintText: '入力...'),
           ),

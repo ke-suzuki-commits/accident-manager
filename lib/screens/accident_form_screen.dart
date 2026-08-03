@@ -357,9 +357,15 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     TextInputType? keyboardType,
     bool required = false,
   }) {
+    // 複数行の入力欄(maxLines > 1、例: 発生内容の詳細)は、スマホ等の狭い画面だと
+    // 同じ文章でも折り返し行数が増え、固定行数のままでは入力中の文字が見切れる。
+    // そのためminLinesを基準行数、maxLinesを無制限にし、内容量に応じて
+    // 入力欄の高さが自動的に伸びるようにする(単一行の項目は影響なし)。
+    final isMultiline = maxLines > 1;
     return TextFormField(
       controller: ctrl,
-      maxLines: maxLines,
+      minLines: isMultiline ? maxLines : 1,
+      maxLines: isMultiline ? null : 1,
       keyboardType: keyboardType,
       decoration: InputDecoration(labelText: label),
       validator: required

@@ -44,5 +44,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
+
+    // アプリ全体設定(Gemini APIキー等)。全社共有・閲覧は全員可、変更は管理者のみ。
+    match /app_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

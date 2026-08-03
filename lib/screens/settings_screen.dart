@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'employee_management_screen.dart';
-import 'login_screen.dart';
 import 'target_setting_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -18,6 +17,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _apiKeyCtrl = TextEditingController();
   final _userNameCtrl = TextEditingController();
   bool _obscureKey = true;
+  bool _apiKeySaving = false;
+  bool _apiKeyDirty = false;
 
   @override
   void initState() {
@@ -34,14 +35,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _saveUserName() async {
     final settings = context.read<SettingsService>();
-    await settings.setApiKey(_apiKeyCtrl.text.trim());
     await settings.setUserName(_userNameCtrl.text.trim());
     if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('設定を保存しました')));
+    }
+  }
+
+  Future<void> _saveApiKey() async {
+    final settings = context.read<SettingsService>();
+    final auth = context.read<AuthService>();
+    setState(() => _apiKeySaving = true);
+    try {
+      await settings.setApiKey(
+        _apiKeyCtrl.text.trim(),
+        updatedBy: auth.currentUser?.name ?? '(不明)',
+      );
+      if (mounted) {
+        setState(() => _apiKeyDirty = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gemini APIキーを更新しました（全社員に共有されます）')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _apiKeySaving = false);
     }
   }
 
@@ -105,76 +131,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: '管理者名（原因分析の記録者名として使用されます）',
                   ),
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saveUserName,
+                    child: const Text('保存'),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            _card(
-              title: 'AI原因分析（Gemini API）',
-              children: [
-                const Text(
-                  'なぜなぜ分析のドラフト自動生成にはGemini APIキーが必要です。\n'
-                  'Google AI Studio（https://aistudio.google.com/）で取得したAPIキーを入力してください。',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _apiKeyCtrl,
-                  obscureText: _obscureKey,
-                  decoration: InputDecoration(
-                    labelText: 'Gemini APIキー',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureKey
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscureKey = !_obscureKey),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 16,
-                        color: AppColors.warning,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '暫定運用：現在はアプリ内にキーを保存しています。Firebase接続後はサーバー側(Cloud Functions)で安全に管理する構成に切替予定です。',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(onPressed: _save, child: const Text('保存')),
-            ),
+            // Gemini APIキーは編集者・管理者のみが使う「AIドラフト生成」機能のための
+            // 全社共有設定。費用が発生する社外APIキーのため、登録・変更は管理者限定とする。
+            // (生成済み・保存済みのなぜなぜ分析結果自体は閲覧者も参照可能)
+            if (auth.isAdmin) _geminiApiKeyCard(context),
             const SizedBox(height: 30),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _geminiApiKeyCard(BuildContext context) {
+    return Consumer<SettingsService>(
+      builder: (context, settings, _) {
+        // Firestore側の値が変わった場合(他の管理者が変更した/初回読込完了時)、
+        // 未編集(dirtyでない)なら表示テキストを追従させる。
+        if (!_apiKeyDirty && _apiKeyCtrl.text != settings.geminiApiKey) {
+          _apiKeyCtrl.text = settings.geminiApiKey;
+        }
+        return _card(
+          title: 'AI原因分析（Gemini API）',
+          children: [
+            const Text(
+              'なぜなぜ分析のドラフト自動生成にはGemini APIキーが必要です。\n'
+              'Google AI Studio（https://aistudio.google.com/）で取得したAPIキーを入力してください。\n'
+              'ここで登録したキーは全社員（編集者・管理者）に共有され、AIドラフト生成機能で使用されます。',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (settings.isLoadingApiKey)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              )
+            else
+              TextField(
+                controller: _apiKeyCtrl,
+                obscureText: _obscureKey,
+                onChanged: (_) => setState(() => _apiKeyDirty = true),
+                decoration: InputDecoration(
+                  labelText: 'Gemini APIキー',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureKey
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureKey = !_obscureKey),
+                  ),
+                ),
+              ),
+            if (settings.apiKeyError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                settings.apiKeyError!,
+                style: const TextStyle(fontSize: 11, color: AppColors.danger),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.cloud_done_rounded,
+                    size: 16,
+                    color: AppColors.secondary,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '本運用：Firestoreで一元管理しています。ここで保存すると全社員・全端末に即時反映されます。',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: (_apiKeySaving || settings.isLoadingApiKey)
+                    ? null
+                    : _saveApiKey,
+                child: _apiKeySaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('APIキーを保存'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -287,16 +366,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await context.read<AuthService>().signOut();
-                    if (context.mounted) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
-                      );
-                    }
-                  },
+                  // AuthGateがログイン状態の変化を監視して自動的に
+                  // LoginScreenへ切り替えるため、ここでのNavigator操作は不要
+                  // (むしろAuthGate自体を画面スタックから外してしまい、
+                  //  以後のログイン処理が画面に反映されなくなる不具合の原因になっていた)。
+                  onPressed: () => context.read<AuthService>().signOut(),
                   icon: const Icon(
                     Icons.logout_rounded,
                     size: 18,

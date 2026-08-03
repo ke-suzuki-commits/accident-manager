@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +49,12 @@ void main() async {
     debugPrint('Firebase初期化に失敗しました(ローカル保存で継続します): $e');
   }
 
-  final settingsService = SettingsService();
+  // Gemini APIキーは全社共有設定のため、Firebase接続時のみFirestoreを紐付ける。
+  // (未接続時はローカルのuserNameのみ機能し、APIキー共有機能は安全側で無効化される)
+  final settingsService = SettingsService(
+    firestore: _firebaseReady ? FirebaseFirestore.instance : null,
+    auth: _firebaseReady ? FirebaseAuth.instance : null,
+  );
   await settingsService.load();
 
   runApp(MyApp(settingsService: settingsService));
