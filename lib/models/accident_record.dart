@@ -83,6 +83,63 @@ class CauseAnalysis {
   }
 }
 
+/// 事故後対応の実績（課長面談・班ミーティング）
+/// いずれの項目も任意入力(未実施の場合は空/nullのまま保存可)。
+class FollowUpRecord {
+  final DateTime? interviewDate; // 面談実施日
+  final String interviewerName; // 面談担当者(課長)氏名
+  final DateTime? meetingDate; // 班ミーティング実施日
+
+  const FollowUpRecord({
+    this.interviewDate,
+    this.interviewerName = '',
+    this.meetingDate,
+  });
+
+  bool get isInterviewDone => interviewDate != null;
+  bool get isMeetingDone => meetingDate != null;
+  bool get isComplete => isInterviewDone && isMeetingDone;
+  bool get isEmpty =>
+      interviewDate == null && interviewerName.isEmpty && meetingDate == null;
+
+  Map<String, dynamic> toMap() => {
+    'interviewDate': interviewDate?.toIso8601String(),
+    'interviewerName': interviewerName,
+    'meetingDate': meetingDate?.toIso8601String(),
+  };
+
+  factory FollowUpRecord.fromMap(Map<dynamic, dynamic>? map) {
+    if (map == null) return const FollowUpRecord();
+    return FollowUpRecord(
+      interviewDate: map['interviewDate'] != null
+          ? DateTime.parse(map['interviewDate'] as String)
+          : null,
+      interviewerName: normalizeHalfWidthKana(
+        map['interviewerName'] as String? ?? '',
+      ),
+      meetingDate: map['meetingDate'] != null
+          ? DateTime.parse(map['meetingDate'] as String)
+          : null,
+    );
+  }
+
+  FollowUpRecord copyWith({
+    DateTime? interviewDate,
+    bool clearInterviewDate = false,
+    String? interviewerName,
+    DateTime? meetingDate,
+    bool clearMeetingDate = false,
+  }) {
+    return FollowUpRecord(
+      interviewDate: clearInterviewDate
+          ? null
+          : (interviewDate ?? this.interviewDate),
+      interviewerName: interviewerName ?? this.interviewerName,
+      meetingDate: clearMeetingDate ? null : (meetingDate ?? this.meetingDate),
+    );
+  }
+}
+
 /// 事故記録メインエンティティ
 class AccidentRecord {
   final String id;
@@ -108,6 +165,7 @@ class AccidentRecord {
   final String counterparty; // 荷主(相手方)
   final String description; // 発生内容
   final CauseAnalysis causeAnalysis; // なぜなぜ分析＋真因
+  final FollowUpRecord followUp; // 事故後対応の実績（課長面談・班ミーティング）
   final RecordStatus status; // 進捗ステータス
   final List<String> photoUrls; // 現場写真
   final bool isMigrated; // Excel移行データかどうか
@@ -139,6 +197,7 @@ class AccidentRecord {
     this.counterparty = '',
     this.description = '',
     CauseAnalysis? causeAnalysis,
+    FollowUpRecord? followUp,
     this.status = RecordStatus.reported,
     this.photoUrls = const [],
     this.isMigrated = false,
@@ -149,6 +208,7 @@ class AccidentRecord {
        fiscalYear = fiscalYear ?? calcFiscalYear(occurredAt),
        fiscalMonth = fiscalMonth ?? occurredAt.month,
        causeAnalysis = causeAnalysis ?? const CauseAnalysis(),
+       followUp = followUp ?? const FollowUpRecord(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -181,6 +241,7 @@ class AccidentRecord {
     'counterparty': counterparty,
     'description': description,
     'causeAnalysis': causeAnalysis.toMap(),
+    'followUp': followUp.toMap(),
     'status': status.name,
     'photoUrls': photoUrls,
     'isMigrated': isMigrated,
@@ -238,6 +299,7 @@ class AccidentRecord {
       ),
       description: normalizeHalfWidthKana(map['description'] as String? ?? ''),
       causeAnalysis: CauseAnalysis.fromMap(map['causeAnalysis'] as Map?),
+      followUp: FollowUpRecord.fromMap(map['followUp'] as Map?),
       // 旧バージョンに存在した「承認済み(approved)」は現バージョンの
       // enumから削除したため、該当データは分析完了済みとして扱う。
       status: RecordStatus.values.firstWhere(
@@ -278,6 +340,7 @@ class AccidentRecord {
     String? counterparty,
     String? description,
     CauseAnalysis? causeAnalysis,
+    FollowUpRecord? followUp,
     RecordStatus? status,
     List<String>? photoUrls,
     bool? isMigrated,
@@ -310,6 +373,7 @@ class AccidentRecord {
       counterparty: counterparty ?? this.counterparty,
       description: description ?? this.description,
       causeAnalysis: causeAnalysis ?? this.causeAnalysis,
+      followUp: followUp ?? this.followUp,
       status: status ?? this.status,
       photoUrls: photoUrls ?? this.photoUrls,
       isMigrated: isMigrated ?? this.isMigrated,

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
+import '../models/app_user.dart';
 import '../models/edit_log.dart';
 import '../services/accident_service.dart';
 import '../services/ai_analysis_service.dart';
@@ -31,6 +32,12 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   final _why4Ctrl = TextEditingController();
   final _rootCauseCtrl = TextEditingController();
 
+  // 事故後対応の実績（課長面談・班ミーティング）用の編集中の状態。
+  DateTime? _interviewDate;
+  String _interviewerName = '';
+  DateTime? _meetingDate;
+  bool _isSavingFollowUp = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +51,9 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
     _why3Ctrl.text = _record.causeAnalysis.why3;
     _why4Ctrl.text = _record.causeAnalysis.why4;
     _rootCauseCtrl.text = _record.causeAnalysis.rootCause;
+    _interviewDate = _record.followUp.interviewDate;
+    _interviewerName = _record.followUp.interviewerName;
+    _meetingDate = _record.followUp.meetingDate;
   }
 
   @override
@@ -90,6 +100,66 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  Future<void> _pickInterviewDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _interviewDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _interviewDate = picked);
+  }
+
+  Future<void> _pickMeetingDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _meetingDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _meetingDate = picked);
+  }
+
+  /// 事故後対応の実績（課長面談・班ミーティング）を保存する。
+  /// ※ 本項目はユーザー指示により編集履歴(edit_logs)には記録しない。
+  /// (updateRecordの差分検出は対象フィールドをホワイトリスト管理しており、
+  ///  followUpの変更のみでは差分が検出されないため、自動的にログ対象外となる)
+  Future<void> _saveFollowUp() async {
+    final auth = context.read<AuthService>();
+    setState(() => _isSavingFollowUp = true);
+    try {
+      final updated = _record.copyWith(
+        followUp: _record.followUp.copyWith(
+          interviewDate: _interviewDate,
+          clearInterviewDate: _interviewDate == null,
+          interviewerName: _interviewerName,
+          meetingDate: _meetingDate,
+          clearMeetingDate: _meetingDate == null,
+        ),
+      );
+      await context.read<AccidentService>().updateRecord(
+        updated,
+        editorUid: auth.firebaseUser?.uid ?? '',
+        editorName: auth.currentUser?.name ?? '',
+        editorEmail: auth.currentUser?.email ?? '',
+      );
+      setState(() => _record = updated);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('事故後対応の実績を保存しました')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingFollowUp = false);
     }
   }
 
@@ -185,6 +255,8 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               _buildInfoSection(r),
               const SizedBox(height: 16),
               _buildCauseAnalysisSection(canEdit),
+              const SizedBox(height: 16),
+              _buildFollowUpSection(canEdit),
               const SizedBox(height: 16),
               _buildEditHistorySection(r),
               const SizedBox(height: 24),
@@ -442,6 +514,167 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFollowUpSection(bool canEdit) {
+    final dateFmt = DateFormat('yyyy年MM月dd日');
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '事故後対応の実績',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              '担当課長による面談、および所属班でのミーティングの実施記録です。（任意項目）',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ),
+          if (!canEdit)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                '※閲覧権限のため編集できません。',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ),
+          const SizedBox(height: 14),
+          const Text(
+            '課長面談',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.secondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 220,
+                child: InkWell(
+                  onTap: canEdit ? _pickInterviewDate : null,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: '面談実施日'),
+                    child: Text(
+                      _interviewDate != null
+                          ? dateFmt.format(_interviewDate!)
+                          : '未実施',
+                      style: TextStyle(
+                        color: _interviewDate != null
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 260, child: _interviewerSelector(canEdit)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            '班ミーティング',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.secondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 220,
+            child: InkWell(
+              onTap: canEdit ? _pickMeetingDate : null,
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'ミーティング実施日'),
+                child: Text(
+                  _meetingDate != null ? dateFmt.format(_meetingDate!) : '未実施',
+                  style: TextStyle(
+                    color: _meetingDate != null
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (canEdit)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isSavingFollowUp ? null : _saveFollowUp,
+                child: _isSavingFollowUp
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('事故後対応の実績を保存'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 面談担当者の選択欄。
+  /// 「課長職」に該当する社員マスタが別途無いため、社員アカウント管理に
+  /// 登録済みの編集者・管理者権限の社員を対象に選択させる(閲覧者は除外)。
+  Widget _interviewerSelector(bool canEdit) {
+    if (!canEdit) {
+      return InputDecorator(
+        decoration: const InputDecoration(labelText: '面談担当者'),
+        child: Text(
+          _interviewerName.isEmpty ? '未選択' : _interviewerName,
+          style: TextStyle(
+            color: _interviewerName.isEmpty
+                ? AppColors.textSecondary
+                : AppColors.textPrimary,
+          ),
+        ),
+      );
+    }
+    return StreamBuilder<List<AppUser>>(
+      stream: context.read<AuthService>().watchUsers(),
+      builder: (context, snapshot) {
+        final candidates = (snapshot.data ?? [])
+            .where((u) => u.role.canEdit)
+            .toList();
+        // 保存済みの担当者名が候補一覧に無い場合(退職・権限変更等)でも
+        // 選択値が消えてしまわないよう、ドロップダウンの選択肢に補完しておく。
+        final names = candidates.map((u) => u.name).toSet();
+        if (_interviewerName.isNotEmpty && !names.contains(_interviewerName)) {
+          names.add(_interviewerName);
+        }
+        return DropdownButtonFormField<String>(
+          initialValue: _interviewerName.isEmpty ? null : _interviewerName,
+          decoration: const InputDecoration(labelText: '面談担当者'),
+          hint: const Text('選択してください'),
+          isExpanded: true,
+          items: [
+            for (final name in names)
+              DropdownMenuItem(value: name, child: Text(name)),
+          ],
+          onChanged: (value) =>
+              setState(() => _interviewerName = value ?? ''),
+        );
+      },
     );
   }
 
