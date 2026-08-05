@@ -398,6 +398,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       }
     }
 
+    // 年度ごとの折れ線データを先に構築し、常時ラベル表示
+    // (showingTooltipIndicators)からも同じインスタンスを参照する。
+    final lineBarsData = [
+      for (int i = 0; i < selectedYearsList.length; i++)
+        LineChartBarData(
+          isCurved: true,
+          color: _yearColors[i % _yearColors.length],
+          barWidth: 3,
+          dotData: const FlDotData(show: true),
+          spots: [
+            for (int j = 0; j < months.length; j++)
+              FlSpot(
+                j.toDouble(),
+                (data[selectedYearsList[i]]?[months[j]] ?? 0).toDouble(),
+              ),
+          ],
+        ),
+    ];
+
     return Container(
       height: 260,
       padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
@@ -432,10 +451,50 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Expanded(
             child: LineChart(
               LineChartData(
-                maxY: maxY + 1,
+                // ダッシュボードのグラフと同様、タップ操作なしで常時
+                // 件数ラベルを表示する(役員要望)。タッチによる拡大等の
+                // 操作自体は残しつつ、表示のみ常時ONにする。
+                maxY: (maxY + 1) * 1.15,
                 minY: 0,
                 gridData: const FlGridData(show: true, drawVerticalLine: false),
                 borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  handleBuiltInTouches: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => Colors.transparent,
+                    tooltipPadding: EdgeInsets.zero,
+                    tooltipMargin: 8,
+                    fitInsideVertically: true,
+                    fitInsideHorizontally: true,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final value = spot.y.toInt();
+                        if (value == 0) return null;
+                        final colorIndex = spot.barIndex;
+                        return LineTooltipItem(
+                          '$value',
+                          TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _yearColors[colorIndex % _yearColors.length],
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                showingTooltipIndicators: [
+                  for (int j = 0; j < months.length; j++)
+                    ShowingTooltipIndicators([
+                      for (int i = 0; i < selectedYearsList.length; i++)
+                        if ((data[selectedYearsList[i]]?[months[j]] ?? 0) > 0)
+                          LineBarSpot(
+                            lineBarsData[i],
+                            i,
+                            lineBarsData[i].spots[j],
+                          ),
+                    ]),
+                ],
                 titlesData: FlTitlesData(
                   rightTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
@@ -465,23 +524,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                 ),
-                lineBarsData: [
-                  for (int i = 0; i < selectedYearsList.length; i++)
-                    LineChartBarData(
-                      isCurved: true,
-                      color: _yearColors[i % _yearColors.length],
-                      barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                      spots: [
-                        for (int j = 0; j < months.length; j++)
-                          FlSpot(
-                            j.toDouble(),
-                            (data[selectedYearsList[i]]?[months[j]] ?? 0)
-                                .toDouble(),
-                          ),
-                      ],
-                    ),
-                ],
+                lineBarsData: lineBarsData,
               ),
             ),
           ),
@@ -583,14 +626,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Container(
       height: 240,
-      padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+      padding: const EdgeInsets.fromLTRB(8, 32, 16, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
       child: BarChart(
         BarChartData(
-          maxY: maxY + 1,
+          // ダッシュボードのグラフと同様、タップ操作なしで常時
+          // 件数ラベルを表示する(役員要望)。
+          maxY: (maxY + 1) * 1.3,
+          barTouchData: BarTouchData(
+            enabled: false,
+            handleBuiltInTouches: false,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => Colors.transparent,
+              tooltipPadding: EdgeInsets.zero,
+              tooltipMargin: 4,
+              fitInsideVertically: true,
+              fitInsideHorizontally: true,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final value = rod.toY.toInt();
+                if (value == 0) return null;
+                return BarTooltipItem(
+                  '$value',
+                  TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: _yearColors[rodIndex % _yearColors.length],
+                  ),
+                );
+              },
+            ),
+          ),
           borderData: FlBorderData(show: false),
           gridData: const FlGridData(show: false),
           titlesData: FlTitlesData(
@@ -629,6 +697,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             for (int i = 0; i < allOffices.length; i++)
               BarChartGroupData(
                 x: i,
+                showingTooltipIndicators: [
+                  for (int j = 0; j < selectedYearsList.length; j++)
+                    if ((dataByYear[selectedYearsList[j]]?[allOffices[i]] ??
+                            0) >
+                        0)
+                      j,
+                ],
                 barRods: [
                   for (int j = 0; j < selectedYearsList.length; j++)
                     BarChartRodData(
@@ -765,60 +840,95 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return SizedBox(
       height: 200,
-      child: BarChart(
-        BarChartData(
-          maxY: maxY + 1,
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final idx = value.toInt();
-                  if (idx < 0 || idx >= months.length) {
-                    return const SizedBox();
-                  }
-                  return Text(
-                    '${months[idx]}月',
-                    style: const TextStyle(
+      child: Padding(
+        // ダッシュボードのグラフと同様、タップ操作なしで常時
+        // 件数ラベルを表示する(役員要望)ため、上部余白を確保する。
+        padding: const EdgeInsets.only(top: 24),
+        child: BarChart(
+          BarChartData(
+            maxY: (maxY + 1) * 1.35,
+            barTouchData: BarTouchData(
+              enabled: false,
+              handleBuiltInTouches: false,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => Colors.transparent,
+                tooltipPadding: EdgeInsets.zero,
+                tooltipMargin: 4,
+                fitInsideVertically: true,
+                fitInsideHorizontally: true,
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  final value = rod.toY.toInt();
+                  if (value == 0) return null;
+                  final color = rodIndex == 0
+                      ? AppColors.cardYellow
+                      : AppColors.secondary;
+                  return BarTooltipItem(
+                    '$value',
+                    TextStyle(
                       fontSize: 9,
-                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                      color: color,
                     ),
                   );
                 },
               ),
             ),
-          ),
-          barGroups: [
-            for (int i = 0; i < months.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: charterMonthly[months[i]]!.toDouble(),
-                    color: AppColors.cardYellow,
-                    width: 6,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  BarChartRodData(
-                    toY: ownMonthly[months[i]]!.toDouble(),
-                    color: AppColors.secondary,
-                    width: 6,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ],
+            borderData: FlBorderData(show: false),
+            gridData: const FlGridData(show: false),
+            titlesData: FlTitlesData(
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
               ),
-          ],
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, meta) {
+                    final idx = value.toInt();
+                    if (idx < 0 || idx >= months.length) {
+                      return const SizedBox();
+                    }
+                    return Text(
+                      '${months[idx]}月',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: AppColors.textSecondary,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            barGroups: [
+              for (int i = 0; i < months.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  showingTooltipIndicators: [
+                    if (charterMonthly[months[i]]! > 0) 0,
+                    if (ownMonthly[months[i]]! > 0) 1,
+                  ],
+                  barRods: [
+                    BarChartRodData(
+                      toY: charterMonthly[months[i]]!.toDouble(),
+                      color: AppColors.cardYellow,
+                      width: 6,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    BarChartRodData(
+                      toY: ownMonthly[months[i]]!.toDouble(),
+                      color: AppColors.secondary,
+                      width: 6,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -846,7 +956,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 20, 16, 12),
+      padding: const EdgeInsets.fromLTRB(8, 36, 16, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -857,7 +967,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             height: 220,
             child: BarChart(
               BarChartData(
-                maxY: maxY + 1,
+                // ダッシュボードのグラフと同様、タップ操作なしで常時
+                // 件数ラベルを表示する(役員要望)。
+                maxY: (maxY + 1) * 1.3,
+                barTouchData: BarTouchData(
+                  enabled: false,
+                  handleBuiltInTouches: false,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => Colors.transparent,
+                    tooltipPadding: EdgeInsets.zero,
+                    tooltipMargin: 4,
+                    fitInsideVertically: true,
+                    fitInsideHorizontally: true,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final value = rod.toY.toInt();
+                      if (value == 0) return null;
+                      return BarTooltipItem(
+                        '$value件',
+                        const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      );
+                    },
+                  ),
+                ),
                 borderData: FlBorderData(show: false),
                 gridData: const FlGridData(show: false),
                 titlesData: FlTitlesData(
@@ -896,6 +1031,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   for (int i = 0; i < teams.length; i++)
                     BarChartGroupData(
                       x: i,
+                      showingTooltipIndicators: (merged[teams[i]] ?? 0) > 0
+                          ? [0]
+                          : [],
                       barRods: [
                         BarChartRodData(
                           toY: (merged[teams[i]] ?? 0).toDouble(),

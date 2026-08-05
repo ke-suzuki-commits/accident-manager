@@ -278,8 +278,19 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
+              Text(
+                'No.${r.no}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -297,7 +308,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -315,8 +325,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                   ),
                 ),
               ),
-              if (r.responsibility != Responsibility.atFault) ...[
-                const SizedBox(width: 8),
+              if (r.responsibility != Responsibility.atFault)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -337,7 +346,6 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                     ),
                   ),
                 ),
-              ],
             ],
           ),
           const SizedBox(height: 12),

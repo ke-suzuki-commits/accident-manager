@@ -355,6 +355,9 @@ class AccidentRecord {
     List<String>? photoUrls,
     bool? isMigrated,
     String? createdBy,
+    // No.振り直し等、内容自体は変わらない機械的な更新の場合に
+    // updatedAt(最終更新日時)を意図せず書き換えないためのフラグ。
+    bool keepUpdatedAt = false,
   }) {
     final newOccurredAt = occurredAt ?? this.occurredAt;
     return AccidentRecord(
@@ -390,7 +393,7 @@ class AccidentRecord {
       isMigrated: isMigrated ?? this.isMigrated,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt,
-      updatedAt: DateTime.now(),
+      updatedAt: keepUpdatedAt ? updatedAt : DateTime.now(),
     );
   }
 }

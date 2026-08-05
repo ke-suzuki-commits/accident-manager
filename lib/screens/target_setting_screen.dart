@@ -17,6 +17,7 @@ class TargetSettingScreen extends StatefulWidget {
 }
 
 class _TargetSettingScreenState extends State<TargetSettingScreen> {
+  late final int _currentFiscalYear;
   late int _fiscalYear;
   final _companyCtrl = TextEditingController();
   final Map<Team, TextEditingController> _teamCtrls = {
@@ -25,24 +26,47 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
   };
   bool _isSaving = false;
 
+  // 役員指示によるデフォルト目標値(今年度・未設定の場合のみ表示上プリフィルする)。
+  // 実際にFirestoreへ保存されるのは「保存する」ボタンを押した時点。
+  static const int _defaultCompanyTarget = 54; // 自社事故のみ(庸車除く)
+  static const Map<Team, int> _defaultTeamTargets = {
+    Team.n: 2,
+    Team.m: 2,
+    Team.o: 2,
+  };
+
   @override
   void initState() {
     super.initState();
-    _fiscalYear = AccidentRecord.calcFiscalYear(DateTime.now());
+    _currentFiscalYear = AccidentRecord.calcFiscalYear(DateTime.now());
+    _fiscalYear = _currentFiscalYear;
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadValues());
   }
 
   void _loadValues() {
     final targetService = context.read<AccidentTargetService>();
+    final isCurrentYear = _fiscalYear == _currentFiscalYear;
     final company = targetService.companyTarget(_fiscalYear);
-    _companyCtrl.text = company != null && company.targetCount != 0
-        ? company.targetCount.toString()
-        : '';
+    if (company != null) {
+      _companyCtrl.text = company.targetCount != 0
+          ? company.targetCount.toString()
+          : '';
+    } else {
+      // 未設定(今年度)の場合のみ、役員指示のデフォルト値をプリフィルする。
+      _companyCtrl.text = isCurrentYear ? _defaultCompanyTarget.toString() : '';
+    }
     for (final t in _teamCtrls.keys) {
       final target = targetService.teamTarget(_fiscalYear, t);
-      _teamCtrls[t]!.text = target != null && target.targetCount != 0
-          ? target.targetCount.toString()
-          : '';
+      if (target != null) {
+        _teamCtrls[t]!.text = target.targetCount != 0
+            ? target.targetCount.toString()
+            : '';
+      } else {
+        final defaultVal = _defaultTeamTargets[t];
+        _teamCtrls[t]!.text = (isCurrentYear && defaultVal != null)
+            ? defaultVal.toString()
+            : '';
+      }
     }
     setState(() {});
   }
@@ -90,10 +114,12 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
   @override
   Widget build(BuildContext context) {
     final accidentService = context.watch<AccidentService>();
-    // 目標進捗の基準となる現在件数は、全体集計・班別集計と同じ基準(有責のみ)に揃える。
-    final currentCompanyCount = accidentService
-        .countableByFiscalYear(_fiscalYear)
-        .length;
+    // 全社目標(例:54件)は「自社事故のみ」が基準(庸車事故は含まない)。
+    // 庸車事故は目標の対象外のため、参考件数として別途表示する。
+    final currentCompanyCount = accidentService.ownCompanyAccidentCount(
+      _fiscalYear,
+    );
+    final charterCount = accidentService.charterAccidentCount(_fiscalYear);
     final excludedCount = accidentService.excludedCount(_fiscalYear);
 
     return Scaffold(
@@ -116,10 +142,20 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                 title: '全社目標',
                 children: [
                   Text(
-                    '現在の累計件数: $currentCompanyCount件',
+                    '現在の累計件数(自社事故のみ): $currentCompanyCount件',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '（庸車事故 $charterCount件は目標の対象外・参考件数）',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondary,
+                      ),
                     ),
                   ),
                   if (excludedCount > 0)
@@ -138,7 +174,7 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                     controller: _companyCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: '$_fiscalYear年度 目標件数(全社)',
+                      labelText: '$_fiscalYear年度 目標件数(全社・自社事故のみ)',
                       suffixText: '件',
                     ),
                   ),
@@ -155,6 +191,18 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (_fiscalYear == _currentFiscalYear)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'N班・M班・O班は目標件数2件が初期入力されています。'
+                        '内容を確認し「保存する」を押してください。',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   ...(_teamCtrls.entries.map((entry) {
                     final team = entry.key;

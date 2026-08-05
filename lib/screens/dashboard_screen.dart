@@ -38,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // 集計カード・班別目標進捗に使うのは、集計対象(有責)のもののみ。
         // 一覧表示自体は引き続き全件対象(records)を使用する。
         final records = service.byFiscalYear(selectedYear);
-        final countableRecords = service.countableByFiscalYear(selectedYear);
         final excludedCount = service.excludedCount(selectedYear);
         final excludedBreakdown = service.excludedBreakdown(selectedYear);
         final monthly = service.monthlyCountByFiscalYear(selectedYear);
@@ -46,8 +45,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             service.charterVsOwnMonthlyComparison(selectedYear)[true] ??
             const {};
         final uncompleted = service.uncompletedAnalysisCount(selectedYear);
-        final analyzed = service.analyzedCount(selectedYear);
         final typeBreakdown = service.typeBreakdown(selectedYear);
+        // 全社目標(54件)は「自社事故のみ」が基準のため、庸車事故を除いた件数を
+        // 別途算出する。庸車事故は目標の対象外のため、参考件数として別枠表示する。
+        final ownCompanyCount = service.ownCompanyAccidentCount(selectedYear);
+        final charterCount = service.charterAccidentCount(selectedYear);
 
         final isDesktop = MediaQuery.of(context).size.width >= 900;
 
@@ -64,9 +66,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildYearSelector(years, currentYear, selectedYear),
                   const SizedBox(height: 16),
                   _buildStatCards(
-                    countableRecords.length,
+                    ownCompanyCount,
+                    charterCount,
                     uncompleted,
-                    analyzed,
                     isDesktop,
                   ),
                   if (excludedCount > 0) ...[
@@ -74,10 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildExcludedMonitorCard(excludedCount, excludedBreakdown),
                   ],
                   const SizedBox(height: 24),
-                  _buildTargetProgressSection(
-                    selectedYear,
-                    countableRecords.length,
-                  ),
+                  _buildTargetProgressSection(selectedYear, ownCompanyCount),
                   const SizedBox(height: 24),
                   _sectionTitle('月別事故発生件数'),
                   const SizedBox(height: 12),
@@ -126,6 +125,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// 全社・班別の年度事故目標に対する進捗モニター(件数・パーセンテージ)。
+  /// ※全社目標(例:54件)は「自社事故のみ」が基準(庸車事故は含まない)ため、
+  ///   ここで渡すcurrentCountは呼び出し側で自社事故のみに絞り込んだ件数を渡す。
   Widget _buildTargetProgressSection(int fiscalYear, int currentCount) {
     return Consumer<AccidentTargetService>(
       builder: (context, targetService, _) {
@@ -179,10 +180,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 '年度事故目標の進捗',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
+              if (companyTarget != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '※全社目標は自社事故のみが対象です（庸車事故は含みません）',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 14),
               if (companyTarget != null)
                 _targetProgressRow(
-                  label: '全社',
+                  label: '全社(自社)',
                   current: currentCount,
                   target: companyTarget.targetCount,
                 ),
@@ -233,9 +245,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             SizedBox(
-              width: 56,
+              width: 80,
               child: Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -268,7 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         Padding(
-          padding: const EdgeInsets.only(left: 66, top: 2),
+          padding: const EdgeInsets.only(left: 90, top: 2),
           child: Text(
             '${pct.toStringAsFixed(1)}%',
             style: TextStyle(
@@ -367,18 +381,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ダッシュボード上部の統計カード。
+  // ※以前は「自社+庸車の合計」「分析完了件数」「分析完了率」の4枚構成だったが、
+  //   運用上「事故件数は自社と庸車を分けて見たい」「分析完了系の2枚は不要」との
+  //   要望を受け、「自社事故」「庸車事故」「原因分析待ち」の3枚構成に変更する。
   Widget _buildStatCards(
-    int total,
+    int ownCompanyCount,
+    int charterCount,
     int uncompleted,
-    int analyzed,
     bool isDesktop,
   ) {
     final cards = [
       StatCard(
-        label: '事故件数',
-        value: '$total件',
+        label: '自社事故',
+        value: '$ownCompanyCount件',
         icon: Icons.warning_amber_rounded,
         color: AppColors.cardTeal,
+      ),
+      StatCard(
+        label: '庸車事故',
+        value: '$charterCount件',
+        icon: Icons.local_shipping_outlined,
+        color: AppColors.cardPink,
       ),
       StatCard(
         label: '原因分析待ち',
@@ -386,28 +410,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.psychology_alt_rounded,
         color: AppColors.cardYellow,
       ),
-      StatCard(
-        label: '分析完了',
-        value: '$analyzed件',
-        icon: Icons.verified_rounded,
-        color: AppColors.cardPurple,
-      ),
-      StatCard(
-        label: '分析完了率',
-        value: total == 0
-            ? '-'
-            : '${(((total - uncompleted) / total) * 100).round()}%',
-        icon: Icons.trending_up_rounded,
-        color: AppColors.cardPink,
-      ),
     ];
     return GridView.count(
-      crossAxisCount: isDesktop ? 4 : 2,
+      crossAxisCount: isDesktop ? 3 : 3,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
-      childAspectRatio: isDesktop ? 1.3 : 1.15,
+      childAspectRatio: isDesktop ? 1.5 : 0.95,
       children: cards,
     );
   }

@@ -8,6 +8,18 @@ import '../widgets/accident_list_tile.dart';
 import 'accident_detail_screen.dart';
 import 'accident_form_screen.dart';
 
+/// 事故一覧の並び替え順。
+/// デフォルトは発生日時が新しい順（従来の挙動を維持）。
+enum AccidentSortOrder {
+  occurredDesc('発生日時が新しい順'),
+  occurredAsc('発生日時が古い順'),
+  noDesc('No.が大きい順'),
+  noAsc('No.が小さい順');
+
+  final String label;
+  const AccidentSortOrder(this.label);
+}
+
 class AccidentListScreen extends StatefulWidget {
   const AccidentListScreen({super.key});
 
@@ -21,6 +33,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
   OfficeDept? _officeFilter;
   Team? _teamFilter;
   String _keyword = '';
+  AccidentSortOrder _sortOrder = AccidentSortOrder.occurredDesc;
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +61,31 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
           records = records
               .where(
                 (r) =>
+                    r.no.toString() == kw ||
                     r.location.toLowerCase().contains(kw) ||
                     r.description.toLowerCase().contains(kw) ||
                     r.driverName.toLowerCase().contains(kw) ||
                     r.counterparty.toLowerCase().contains(kw),
               )
               .toList();
+        }
+
+        // 並び替え。service.recordsはロード時点で発生日時降順にソート済みだが、
+        // ユーザーが選択した順序に応じてここで明示的に並べ替える。
+        records = [...records];
+        switch (_sortOrder) {
+          case AccidentSortOrder.occurredDesc:
+            records.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+            break;
+          case AccidentSortOrder.occurredAsc:
+            records.sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
+            break;
+          case AccidentSortOrder.noDesc:
+            records.sort((a, b) => b.no.compareTo(a.no));
+            break;
+          case AccidentSortOrder.noAsc:
+            records.sort((a, b) => a.no.compareTo(b.no));
+            break;
         }
 
         final isDesktop = MediaQuery.of(context).size.width >= 900;
@@ -71,10 +103,10 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                 children: [
                   TextField(
                     decoration: InputDecoration(
-                      hintText: '場所・内容・氏名・相手方で検索',
+                      hintText: 'No.・場所・内容・氏名・相手方で検索',
                       prefixIcon: const Icon(Icons.search_rounded),
                     ),
-                    onChanged: (v) => setState(() => _keyword = v),
+                    onChanged: (v) => setState(() => _keyword = v.trim()),
                   ),
                   const SizedBox(height: 10),
                   // 高さを固定するとチップ内の文字が縦方向に見切れることがあるため、
@@ -84,6 +116,14 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                     padding: const EdgeInsets.only(right: 4),
                     child: Row(
                       children: [
+                        _sortDropdown(),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 1,
+                          height: 24,
+                          color: const Color(0xFFE0E0E0),
+                        ),
+                        const SizedBox(width: 8),
                         _filterDropdownYear(service.availableFiscalYears),
                         const SizedBox(width: 8),
                         _filterDropdownType(),
@@ -134,6 +174,59 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _sortDropdown() {
+    return PopupMenuButton<AccidentSortOrder>(
+      onSelected: (v) => setState(() => _sortOrder = v),
+      itemBuilder: (context) => [
+        for (final order in AccidentSortOrder.values)
+          PopupMenuItem<AccidentSortOrder>(
+            value: order,
+            child: Row(
+              children: [
+                if (order == _sortOrder)
+                  const Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: AppColors.secondary,
+                  )
+                else
+                  const SizedBox(width: 16),
+                const SizedBox(width: 6),
+                Text(order.label),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.secondary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.sort_rounded,
+              size: 15,
+              color: AppColors.secondary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              _sortOrder.label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.secondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

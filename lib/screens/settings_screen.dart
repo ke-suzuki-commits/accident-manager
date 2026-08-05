@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/accident_service.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
@@ -19,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureKey = true;
   bool _apiKeySaving = false;
   bool _apiKeyDirty = false;
+  bool _isRenumbering = false;
 
   @override
   void initState() {
@@ -42,6 +44,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('設定を保存しました')));
+    }
+  }
+
+  Future<void> _confirmRenumber() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('事故No.の振り直し'),
+        content: const Text(
+          '登録されている全ての事故記録を、発生日時が古いものから順に'
+          'No.1から振り直します。\n\n'
+          'この操作は取り消せません。実行してよろしいですか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('実行する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isRenumbering = true);
+    try {
+      final count = await context
+          .read<AccidentService>()
+          .renumberAllByOccurredAt();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              count > 0 ? '$count件のNo.を振り直しました' : '全て発生日時順になっており、変更はありませんでした',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('振り直しに失敗しました: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isRenumbering = false);
     }
   }
 
@@ -117,6 +168,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (_) => const TargetSettingScreen(),
                       ),
                     ),
+                  ),
+                  const Divider(height: 24),
+                  _menuTile(
+                    context,
+                    icon: Icons.format_list_numbered_rounded,
+                    label: '事故No.の振り直し',
+                    subtitle: '発生日時が古い順にNo.1から再採番',
+                    trailing: _isRenumbering
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                    onTap: _isRenumbering ? null : _confirmRenumber,
                   ),
                 ],
               ),
@@ -394,7 +460,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required String label,
     required String subtitle,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
@@ -421,10 +488,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textSecondary,
-          ),
+          trailing ??
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
         ],
       ),
     );

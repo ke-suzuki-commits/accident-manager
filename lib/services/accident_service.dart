@@ -148,6 +148,33 @@ class AccidentService extends ChangeNotifier {
     }
   }
 
+  /// 登録済みの全事故記録を「発生日時が古いもの順」にNo.1から振り直す。
+  /// 手動採番のずれ・Excel移行データの不整合をまとめて解消するための
+  /// 管理者向け一括処理。実行後は自動でloadRecords()により再読込する。
+  /// 戻り値: 実際に振り直した件数（No.に変更が無かった件を除く）。
+  Future<int> renumberAllByOccurredAt() async {
+    try {
+      final sorted = [..._records]
+        ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
+      final updated = <AccidentRecord>[];
+      for (var i = 0; i < sorted.length; i++) {
+        final newNo = i + 1;
+        if (sorted[i].no != newNo) {
+          updated.add(sorted[i].copyWith(no: newNo, keepUpdatedAt: true));
+        }
+      }
+      if (updated.isNotEmpty) {
+        await _repository.saveAll(updated);
+        await loadRecords();
+      }
+      return updated.length;
+    } catch (e) {
+      _error = 'No.の振り直しに失敗しました: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   // ---------- 集計・分析用ヘルパー ----------
 
   List<int> get availableFiscalYears {

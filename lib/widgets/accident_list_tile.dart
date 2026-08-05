@@ -59,8 +59,19 @@ class AccidentListTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
+                          Text(
+                            'No.${record.no}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -79,8 +90,7 @@ class AccidentListTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (record.team.name != 'unassigned') ...[
-                            const SizedBox(width: 6),
+                          if (record.team.name != 'unassigned')
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -101,8 +111,6 @@ class AccidentListTile extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ],
-                          const SizedBox(width: 8),
                           Text(
                             dateStr,
                             style: const TextStyle(
