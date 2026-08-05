@@ -90,9 +90,11 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
   @override
   Widget build(BuildContext context) {
     final accidentService = context.watch<AccidentService>();
+    // 目標進捗の基準となる現在件数は、全体集計・班別集計と同じ基準(有責のみ)に揃える。
     final currentCompanyCount = accidentService
-        .byFiscalYear(_fiscalYear)
+        .countableByFiscalYear(_fiscalYear)
         .length;
+    final excludedCount = accidentService.excludedCount(_fiscalYear);
 
     return Scaffold(
       appBar: AppBar(
@@ -120,6 +122,17 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (excludedCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '（無責・責任区分不明 $excludedCount件は集計対象外）',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _companyCtrl,
@@ -146,7 +159,7 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                   ...(_teamCtrls.entries.map((entry) {
                     final team = entry.key;
                     final count = accidentService
-                        .byFiscalYear(_fiscalYear)
+                        .countableByFiscalYear(_fiscalYear)
                         .where((r) => r.team == team)
                         .length;
                     return Padding(

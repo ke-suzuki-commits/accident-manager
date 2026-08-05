@@ -62,6 +62,20 @@ class AppColors {
         return success;
     }
   }
+
+  /// 責任区分ごとの表示色。
+  /// 有責(通常)は目立たせる必要がないためグレー、無責・責任区分不明は
+  /// 「集計対象外」であることに注意を促すためオレンジ系で強調する。
+  static Color forResponsibility(Responsibility r) {
+    switch (r) {
+      case Responsibility.atFault:
+        return textSecondary;
+      case Responsibility.noFault:
+        return const Color(0xFF00897B); // ティール系(無責=問題なしのニュアンス)
+      case Responsibility.unclear:
+        return warning; // 要確認のニュアンス
+    }
+  }
 }
 
 class AppTheme {

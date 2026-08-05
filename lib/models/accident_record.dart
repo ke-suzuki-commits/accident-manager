@@ -147,6 +147,7 @@ class AccidentRecord {
   final OfficeDept office; // 発生部署
   final Team team; // 班（小集団活動の班単位）
   final AccidentType accidentType; // 発生区分
+  final Responsibility responsibility; // 責任区分（有責/無責/責任区分不明）
   final PartsAccidentCause? partsCause; // 部品事故発生要因（部品事故の場合のみ）
   final DateTime occurredAt; // 発生日時
   final int fiscalYear; // 年度（4月始まり）
@@ -179,6 +180,7 @@ class AccidentRecord {
     required this.office,
     this.team = Team.unassigned,
     required this.accidentType,
+    this.responsibility = Responsibility.atFault,
     this.partsCause,
     required this.occurredAt,
     int? fiscalYear,
@@ -223,6 +225,7 @@ class AccidentRecord {
     'office': office.name,
     'team': team.name,
     'accidentType': accidentType.name,
+    'responsibility': responsibility.name,
     'partsCause': partsCause?.name,
     'occurredAt': occurredAt.toIso8601String(),
     'fiscalYear': fiscalYear,
@@ -267,6 +270,12 @@ class AccidentRecord {
       accidentType: AccidentType.values.firstWhere(
         (e) => e.name == map['accidentType'],
         orElse: () => AccidentType.property,
+      ),
+      // 既存データ(責任区分導入以前のもの)にはresponsibilityが存在しないため、
+      // その場合は「有責」として扱う(後方互換。従来の集計結果を変えないため)。
+      responsibility: Responsibility.values.firstWhere(
+        (e) => e.name == map['responsibility'],
+        orElse: () => Responsibility.atFault,
       ),
       partsCause: map['partsCause'] != null
           ? PartsAccidentCause.values.firstWhere(
@@ -323,6 +332,7 @@ class AccidentRecord {
     OfficeDept? office,
     Team? team,
     AccidentType? accidentType,
+    Responsibility? responsibility,
     PartsAccidentCause? partsCause,
     bool clearPartsCause = false,
     DateTime? occurredAt,
@@ -353,6 +363,7 @@ class AccidentRecord {
       office: office ?? this.office,
       team: team ?? this.team,
       accidentType: accidentType ?? this.accidentType,
+      responsibility: responsibility ?? this.responsibility,
       partsCause: clearPartsCause ? null : (partsCause ?? this.partsCause),
       occurredAt: newOccurredAt,
       fiscalYear: calcFiscalYear(newOccurredAt),

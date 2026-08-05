@@ -535,7 +535,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 Padding(padding: const EdgeInsets.all(8), child: Text('$y年度')),
                 Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Text('${service.byFiscalYear(y).length}件'),
+                  child: Text('${service.countableByFiscalYear(y).length}件'),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(8),
@@ -544,6 +544,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ],
             ),
         ],
+      ),
+    );
+  }
+
+  /// 選択中の年度合計で、集計対象外(無責・責任区分不明)の件数を表示する
+  /// モニター注記。どの集計セリクションの下にも入れられるように、
+  /// マリパネゼントドメイン(0件の年度のみ非表示)として切り出す。
+  Widget? _excludedNote(AccidentService service, List<int> years) {
+    var total = 0;
+    for (final y in years) {
+      total += service.excludedCount(y);
+    }
+    if (total <= 0) return null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        '※無責・責任区分不明のため集計対象外: $total件（選択中の年度合計）',
+        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
       ),
     );
   }
@@ -901,6 +919,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
           ],
+          if (_excludedNote(service, selectedYearsList) != null)
+            _excludedNote(service, selectedYearsList)!,
         ],
       ),
     );

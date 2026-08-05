@@ -315,6 +315,29 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                   ),
                 ),
               ),
+              if (r.responsibility != Responsibility.atFault) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.forResponsibility(
+                      r.responsibility,
+                    ).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${r.responsibility.label}（集計対象外）',
+                    style: TextStyle(
+                      color: AppColors.forResponsibility(r.responsibility),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -345,6 +368,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       ('発生部署', r.office.label),
       ('発生区分（庸車/自社）', r.office.isCharter ? '庸車事故' : '自社事故'),
       ('班', r.team.label),
+      ('責任区分', r.responsibility.label),
       if (r.partsCause != null) ('発生要因', r.partsCause!.label),
       ('氏名', r.driverName.isEmpty ? '-' : r.driverName),
       ('社員番号', r.employeeNumber.isEmpty ? '-' : r.employeeNumber),
@@ -436,29 +460,33 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Text(
-                  '原因分析（なぜなぜ分析）',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
+              const Text(
+                '原因分析（なぜなぜ分析）',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
-              if (canEdit)
-                ElevatedButton.icon(
-                  onPressed: _isGenerating ? null : _generateAiDraft,
-                  icon: _isGenerating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.auto_awesome_rounded, size: 18),
-                  label: Text(_isGenerating ? '生成中...' : 'AIでドラフト生成'),
+              if (canEdit) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isGenerating ? null : _generateAiDraft,
+                    icon: _isGenerating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.auto_awesome_rounded, size: 18),
+                    label: Text(_isGenerating ? '生成中...' : 'AIでドラフト生成'),
+                  ),
                 ),
+              ],
             ],
           ),
           if (!canEdit)

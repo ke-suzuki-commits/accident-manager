@@ -127,6 +127,30 @@ enum Team {
   }
 }
 
+/// 責任区分（自社に責任があるかどうかの分類）
+/// 役員要望により、無責・責任区分不明の事故は全体集計・班別集計の
+/// カウント対象から除外するための分類軸として追加。
+enum Responsibility {
+  atFault('有責'),
+  noFault('無責'),
+  unclear('責任区分不明');
+
+  final String label;
+  const Responsibility(this.label);
+
+  static Responsibility fromLabel(String? label) {
+    if (label == null) return Responsibility.atFault;
+    return Responsibility.values.firstWhere(
+      (e) => e.label == label,
+      orElse: () => Responsibility.atFault,
+    );
+  }
+
+  /// 全体集計・班別集計等のカウント対象になるか。
+  /// 無責・責任区分不明は自社の事故件数として数えない。
+  bool get isCountable => this == Responsibility.atFault;
+}
+
 /// 保険適用有無
 enum InsuranceStatus {
   yes('有'),

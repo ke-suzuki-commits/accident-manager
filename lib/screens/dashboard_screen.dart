@@ -35,7 +35,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // 集計カード・班別目標進捗に使うのは、集計対象(有責)のもののみ。
+        // 一覧表示自体は引き続き全件対象(records)を使用する。
         final records = service.byFiscalYear(selectedYear);
+        final countableRecords = service.countableByFiscalYear(selectedYear);
+        final excludedCount = service.excludedCount(selectedYear);
+        final excludedBreakdown = service.excludedBreakdown(selectedYear);
         final monthly = service.monthlyCountByFiscalYear(selectedYear);
         final charterMonthly =
             service.charterVsOwnMonthlyComparison(selectedYear)[true] ??
@@ -59,13 +64,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildYearSelector(years, currentYear, selectedYear),
                   const SizedBox(height: 16),
                   _buildStatCards(
-                    records.length,
+                    countableRecords.length,
                     uncompleted,
                     analyzed,
                     isDesktop,
                   ),
+                  if (excludedCount > 0) ...[
+                    const SizedBox(height: 12),
+                    _buildExcludedMonitorCard(excludedCount, excludedBreakdown),
+                  ],
                   const SizedBox(height: 24),
-                  _buildTargetProgressSection(selectedYear, records.length),
+                  _buildTargetProgressSection(
+                    selectedYear,
+                    countableRecords.length,
+                  ),
                   const SizedBox(height: 24),
                   _sectionTitle('月別事故発生件数'),
                   const SizedBox(height: 12),
@@ -186,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         .label,
                     current: context
                         .read<AccidentService>()
-                        .byFiscalYear(fiscalYear)
+                        .countableByFiscalYear(fiscalYear)
                         .where((r) => TargetScope.forTeam(r.team) == t.scope)
                         .length,
                     target: t.targetCount,
@@ -397,6 +409,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 12,
       childAspectRatio: isDesktop ? 1.3 : 1.15,
       children: cards,
+    );
+  }
+
+  /// 無責・責任区分不明のためカウント対象外になっている件数のモニターカード。
+  /// 全体集計・班別集計からは除外されるが、実際に何件あるかを可視化しないと
+  /// 「見えない事故」になってしまうため、専用の注記カードとして表示する。
+  /// 0件の年度では非表示にし、UIバランスを保つ。
+  Widget _buildExcludedMonitorCard(
+    int excludedCount,
+    Map<Responsibility, int> breakdown,
+  ) {
+    final noFault = breakdown[Responsibility.noFault] ?? 0;
+    final unclear = breakdown[Responsibility.unclear] ?? 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.visibility_outlined,
+            size: 20,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '集計対象外(無責・責任区分不明): $excludedCount件',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warning,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '無責 $noFault件 / 責任区分不明 $unclear件（上記の事故件数・班別集計には含まれません）',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

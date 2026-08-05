@@ -21,6 +21,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
   late OfficeDept _office;
   late Team _team;
   late AccidentType _accidentType;
+  late Responsibility _responsibility;
   PartsAccidentCause? _partsCause;
   late DateTime _occurredAt;
   late InsuranceStatus _insurance;
@@ -45,6 +46,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     _office = e?.office ?? OfficeDept.first;
     _team = e?.team ?? Team.unassigned;
     _accidentType = e?.accidentType ?? AccidentType.property;
+    _responsibility = e?.responsibility ?? Responsibility.atFault;
     _partsCause = e?.partsCause;
     _occurredAt = e?.occurredAt ?? DateTime.now();
     _insurance = e?.insurance ?? InsuranceStatus.unknown;
@@ -123,6 +125,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       office: _office,
       team: _team,
       accidentType: _accidentType,
+      responsibility: _responsibility,
       partsCause: _accidentType == AccidentType.parts ? _partsCause : null,
       occurredAt: _occurredAt,
       // IME入力モードの誤りで半角カタカナが混在した場合の文字化け
@@ -223,6 +226,26 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                       onChanged: (v) => setState(() => _partsCause = v),
                     ),
                   ],
+                  const SizedBox(height: 12),
+                  _dropdownField<Responsibility>(
+                    label: '責任区分',
+                    value: _responsibility,
+                    items: Responsibility.values,
+                    itemLabel: (e) => e.label,
+                    onChanged: (v) => setState(() => _responsibility = v!),
+                  ),
+                  if (_responsibility != Responsibility.atFault)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        '※無責・責任区分不明の事故は、全体集計・班別集計の件数には'
+                        '加算されません（一覧・詳細には表示されます）。',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   _textField(_locationCtrl, '発生場所'),
                 ]),

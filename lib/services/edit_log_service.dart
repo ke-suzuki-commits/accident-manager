@@ -102,6 +102,7 @@ class EditLogService {
     check('発生部署', before.office.label, after.office.label);
     check('班', before.team.label, after.team.label);
     check('発生区分', before.accidentType.label, after.accidentType.label);
+    check('責任区分', before.responsibility.label, after.responsibility.label);
     check(
       '発生要因',
       before.partsCause?.label ?? '',
