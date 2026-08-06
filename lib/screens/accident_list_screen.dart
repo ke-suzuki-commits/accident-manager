@@ -21,7 +21,21 @@ enum AccidentSortOrder {
 }
 
 class AccidentListScreen extends StatefulWidget {
-  const AccidentListScreen({super.key});
+  // ダッシュボードの班別目標カードなどから、特定の年度・班に絞り込んだ状態で
+  // 直接この一覧を開けるようにするための初期フィルタ値(任意)。
+  final int? initialYearFilter;
+  final Team? initialTeamFilter;
+  // ホーム画面のボトムナビ内タブとして表示する場合はfalse(AppBar無し、
+  // ResponsiveShell側のヘッダーを使う)。ダッシュボード等からNavigator.push
+  // で単独画面として開く場合はtrueにし、戻るボタン付きのAppBarを表示する。
+  final bool standalone;
+
+  const AccidentListScreen({
+    super.key,
+    this.initialYearFilter,
+    this.initialTeamFilter,
+    this.standalone = false,
+  });
 
   @override
   State<AccidentListScreen> createState() => _AccidentListScreenState();
@@ -34,6 +48,13 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
   Team? _teamFilter;
   String _keyword = '';
   AccidentSortOrder _sortOrder = AccidentSortOrder.occurredDesc;
+
+  @override
+  void initState() {
+    super.initState();
+    _yearFilter = widget.initialYearFilter;
+    _teamFilter = widget.initialTeamFilter;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +111,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
 
         final isDesktop = MediaQuery.of(context).size.width >= 900;
 
-        return Column(
+        final body = Column(
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(
@@ -173,6 +194,24 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
             ),
           ],
         );
+
+        // ダッシュボードの班別目標カード等からNavigator.pushで単独画面として
+        // 開いた場合、ホーム画面のボトムナビ/サイドナビによる戻り手段が無い
+        // ため、戻るボタン付きのAppBarで明示的にラップする。
+        if (widget.standalone) {
+          return Scaffold(
+            appBar: AppBar(
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.headerGradient,
+                ),
+              ),
+              title: const Text('事故一覧'),
+            ),
+            body: SafeArea(child: body),
+          );
+        }
+        return body;
       },
     );
   }

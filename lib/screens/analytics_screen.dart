@@ -3,10 +3,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
+import 'package:intl/intl.dart';
 import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
 import '../services/insight_engine.dart';
 import '../theme/app_theme.dart';
+import 'accident_detail_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -53,6 +55,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 _sectionTitle('AIによる傾向分析'),
                 const SizedBox(height: 12),
                 _buildInsightSection(service),
+                const SizedBox(height: 24),
+                _sectionTitle('多重事故者（2件以上）'),
+                const SizedBox(height: 12),
+                _buildRepeatOffendersSection(service),
                 const SizedBox(height: 24),
                 _sectionTitle('前年度同月比較'),
                 const SizedBox(height: 12),
@@ -247,6 +253,176 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 複数事故を起こしている事故惹起者（多重事故者）を一覧表示するセクション。
+  /// 対象は全期間累計(氏名優先、氏名未入力の場合のみ社員番号でグルーピング)。
+  /// ダッシュボード等の件数集計と同様、無責・責任区分不明の事故は
+  /// 集計対象から除外する(有責事故のみを対象)。
+  Widget _buildRepeatOffendersSection(AccidentService service) {
+    final offenders = service.repeatOffenders();
+
+    if (offenders.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          '現在、2件以上事故を起こしている方はいません',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.report_gmailerrorred_rounded,
+                size: 18,
+                color: AppColors.danger,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '対象者: ${offenders.length}名（全期間累計）',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '氏名（未入力の場合は社員番号）を基準に、有責の事故を複数回起こしている方を'
+            '件数が多い順に表示しています（無責・責任区分不明の事故は含みません）。'
+            '安全教育・面談の優先対象の把握にご活用ください。',
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.5),
+          ),
+          const SizedBox(height: 14),
+          for (final o in offenders) _repeatOffenderTile(o),
+        ],
+      ),
+    );
+  }
+
+  Widget _repeatOffenderTile(RepeatOffender offender) {
+    final color = offender.count >= 3 ? AppColors.danger : AppColors.warning;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  offender.driverName.isEmpty ? '(氏名未入力)' : offender.driverName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (offender.employeeNumber.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '社員番号: ${offender.employeeNumber}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${offender.count}件',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+          children: [
+            for (final r in offender.records) _repeatOffenderRecordRow(r),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _repeatOffenderRecordRow(AccidentRecord r) {
+    final dateStr = DateFormat('yyyy/MM/dd').format(r.occurredAt);
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AccidentDetailScreen(record: r)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Text(
+              'No.${r.no}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              dateStr,
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                r.location.isEmpty ? '(場所未記入)' : r.location,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }

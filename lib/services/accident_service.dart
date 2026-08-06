@@ -5,6 +5,22 @@ import '../models/edit_log.dart';
 import '../repositories/accident_repository.dart';
 import 'edit_log_service.dart';
 
+/// 複数事故を起こしている事故惹起者（多重事故者）の集計結果1件分。
+/// 社員番号があればそれをキーに、無ければ氏名をキーにグルーピングする。
+class RepeatOffender {
+  final String driverName;
+  final String employeeNumber;
+  final List<AccidentRecord> records; // 発生日時が新しい順
+
+  RepeatOffender({
+    required this.driverName,
+    required this.employeeNumber,
+    required this.records,
+  });
+
+  int get count => records.length;
+}
+
 /// 事故記録の状態管理サービス（Provider経由でアプリ全体から利用）
 class AccidentService extends ChangeNotifier {
   final AccidentRepository _repository;
@@ -357,5 +373,57 @@ class AccidentService extends ChangeNotifier {
       true: monthlyCountByFiscalYear(fiscalYear),
       false: monthlyCountByFiscalYear(fiscalYear - 1),
     };
+  }
+
+  /// 複数事故を起こしている事故惹起者（多重事故者）を集計する。
+  ///
+  /// グルーピングは氏名（driverName）を第一のキーとする。
+  /// ※ 社員番号(employeeNumber)は移行データ等で未入力・仮値のまま入っている
+  /// ケースがあり、これをキーにすると本来別人の事故が同一人物として
+  /// 誤って集約されてしまう不具合があったため、氏名一致を優先する方式に
+  /// 変更した。氏名が空の記録のみ、社員番号があればそれをキーとして扱う。
+  /// 氏名・社員番号のいずれも空の記録は個人特定ができないため集計対象から
+  /// 除外する。
+  ///
+  /// ※ ダッシュボード等の「件数」集計と同様に、無責・責任区分不明の事故は
+  /// 集計対象から除外する（役員要望に合わせ、有責事故のみを対象とする）。
+  ///
+  /// [minCount] 以上の事故件数を持つ人物のみを、件数の多い順（同数の場合は
+  /// 直近の事故が新しい順）に返す。
+  List<RepeatOffender> repeatOffenders({int minCount = 2}) {
+    final grouped = <String, List<AccidentRecord>>{};
+
+    for (final r in _records) {
+      if (!r.responsibility.isCountable) continue; // 無責・責任区分不明は除外
+      final name = r.driverName.trim();
+      final empNo = r.employeeNumber.trim();
+      if (name.isEmpty && empNo.isEmpty) continue;
+      final key = name.isNotEmpty ? 'name:$name' : 'emp:$empNo';
+      grouped.putIfAbsent(key, () => []).add(r);
+    }
+
+    final result = <RepeatOffender>[];
+    grouped.forEach((key, records) {
+      if (records.length < minCount) return;
+      final sorted = [...records]
+        ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+      // 表示用の氏名・社員番号は、直近(最新)の事故記録の入力内容を優先する
+      // (同一人物でも過去の記録に氏名の表記ゆれ等がある場合があるため)。
+      final latest = sorted.first;
+      result.add(
+        RepeatOffender(
+          driverName: latest.driverName.trim(),
+          employeeNumber: latest.employeeNumber.trim(),
+          records: sorted,
+        ),
+      );
+    });
+
+    result.sort((a, b) {
+      final byCount = b.count.compareTo(a.count);
+      if (byCount != 0) return byCount;
+      return b.records.first.occurredAt.compareTo(a.records.first.occurredAt);
+    });
+    return result;
   }
 }

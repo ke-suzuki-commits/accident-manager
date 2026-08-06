@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/accident_list_tile.dart';
 import 'accident_detail_screen.dart';
+import 'accident_list_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -44,12 +45,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final charterMonthly =
             service.charterVsOwnMonthlyComparison(selectedYear)[true] ??
             const {};
-        final uncompleted = service.uncompletedAnalysisCount(selectedYear);
         final typeBreakdown = service.typeBreakdown(selectedYear);
         // 全社目標(54件)は「自社事故のみ」が基準のため、庸車事故を除いた件数を
         // 別途算出する。庸車事故は目標の対象外のため、参考件数として別枠表示する。
         final ownCompanyCount = service.ownCompanyAccidentCount(selectedYear);
         final charterCount = service.charterAccidentCount(selectedYear);
+        // 「原因分析待ち」カードの代わりに表示する、自社有責事故の年度目標。
+        // (運用上不要と判断された分析完了系モニターに替えて、会社目標を
+        //  一目でわかるようにしたいという要望への対応)
+        final companyTarget = context
+            .watch<AccidentTargetService>()
+            .companyTarget(selectedYear);
 
         final isDesktop = MediaQuery.of(context).size.width >= 900;
 
@@ -68,7 +74,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildStatCards(
                     ownCompanyCount,
                     charterCount,
-                    uncompleted,
+                    companyTarget,
+                    selectedYear,
                     isDesktop,
                   ),
                   if (excludedCount > 0) ...[
@@ -197,6 +204,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: '全社(自社)',
                   current: currentCount,
                   target: companyTarget.targetCount,
+                  // 全社目標は特定の班に限定されないため、タップでは
+                  // 班フィルタなしの年度のみ絞り込みで一覧を開く。
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AccidentListScreen(
+                        initialYearFilter: fiscalYear,
+                        standalone: true,
+                      ),
+                    ),
+                  ),
                 ),
               for (final t in teamTargets)
                 Padding(
@@ -214,6 +232,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         .where((r) => TargetScope.forTeam(r.team) == t.scope)
                         .length,
                     target: t.targetCount,
+                    // 班カードタップで、その班・その年度に絞り込んだ
+                    // 事故一覧へ遷移する。
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AccidentListScreen(
+                          initialYearFilter: fiscalYear,
+                          initialTeamFilter: Team.values.firstWhere(
+                            (team) => team.name == t.scope,
+                            orElse: () => Team.unassigned,
+                          ),
+                          standalone: true,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -223,10 +256,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// 目標進捗の1行。タップすると該当する年度・班に絞り込んだ事故一覧へ遷移する
+  /// (現場管理者が該当班の事故内容をすぐに確認できるようにするため)。
   Widget _targetProgressRow({
     required String label,
     required int current,
     required int target,
+    VoidCallback? onTap,
   }) {
     if (target <= 0) return const SizedBox();
     final ratio = (current / target).clamp(0.0, 1.5);
@@ -239,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else {
       color = AppColors.danger;
     }
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -279,6 +315,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+            if (onTap != null)
+              const Padding(
+                padding: EdgeInsets.only(left: 2),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+              ),
           ],
         ),
         Padding(
@@ -293,6 +338,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: content,
+        ),
+      ),
     );
   }
 
@@ -384,11 +443,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ダッシュボード上部の統計カード。
   // ※以前は「自社+庸車の合計」「分析完了件数」「分析完了率」の4枚構成だったが、
   //   運用上「事故件数は自社と庸車を分けて見たい」「分析完了系の2枚は不要」との
-  //   要望を受け、「自社事故」「庸車事故」「原因分析待ち」の3枚構成に変更する。
+  //   要望を受け、「自社事故」「庸車事故」「原因分析待ち」の3枚構成に変更した。
+  //   その後、「原因分析待ち」は運用上不要と判断されたため、代わりに
+  //   自社有責事故の年度目標に対する「残り件数(または超過件数)」を
+  //   表示するカードに変更する(会社全体の目標感を一目で把握できるように)。
   Widget _buildStatCards(
     int ownCompanyCount,
     int charterCount,
-    int uncompleted,
+    AccidentTarget? companyTarget,
+    int fiscalYear,
     bool isDesktop,
   ) {
     final cards = [
@@ -404,12 +467,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.local_shipping_outlined,
         color: AppColors.cardPink,
       ),
-      StatCard(
-        label: '原因分析待ち',
-        value: '$uncompleted件',
-        icon: Icons.psychology_alt_rounded,
-        color: AppColors.cardYellow,
-      ),
+      _buildTargetRemainingCard(ownCompanyCount, companyTarget, fiscalYear),
     ];
     return GridView.count(
       crossAxisCount: isDesktop ? 3 : 3,
@@ -419,6 +477,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 12,
       childAspectRatio: isDesktop ? 1.5 : 0.95,
       children: cards,
+    );
+  }
+
+  /// 自社有責事故の年度目標に対する「残り件数」カード。
+  /// - 目標未達成: 「目標まであと◯件」(黄〜緑)
+  /// - 目標到達/超過: 「目標を◯件超過」(赤)
+  /// - 目標未設定: 案内表示のみ
+  /// タップすると、その年度の自社事故一覧へ遷移する。
+  Widget _buildTargetRemainingCard(
+    int ownCompanyCount,
+    AccidentTarget? companyTarget,
+    int fiscalYear,
+  ) {
+    String value;
+    String label;
+    Color color;
+    IconData icon;
+
+    if (companyTarget == null || companyTarget.targetCount <= 0) {
+      value = '未設定';
+      label = '自社事故目標';
+      color = AppColors.cardYellow;
+      icon = Icons.flag_outlined;
+    } else {
+      final remaining = companyTarget.targetCount - ownCompanyCount;
+      if (remaining > 0) {
+        value = 'あと$remaining件';
+        label = '自社事故目標(${companyTarget.targetCount}件)まで';
+        // 残りが目標の30%を切ったら警戒色にする。
+        color = remaining <= companyTarget.targetCount * 0.3
+            ? AppColors.danger
+            : AppColors.cardYellow;
+        icon = Icons.flag_outlined;
+      } else if (remaining == 0) {
+        value = '目標到達';
+        label = '自社事故目標(${companyTarget.targetCount}件)';
+        color = AppColors.danger;
+        icon = Icons.flag_rounded;
+      } else {
+        value = '${-remaining}件超過';
+        label = '自社事故目標(${companyTarget.targetCount}件)を';
+        color = AppColors.danger;
+        icon = Icons.flag_rounded;
+      }
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AccidentListScreen(
+            initialYearFilter: fiscalYear,
+            standalone: true,
+          ),
+        ),
+      ),
+      child: StatCard(label: label, value: value, icon: icon, color: color),
     );
   }
 
