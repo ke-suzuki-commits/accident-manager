@@ -454,6 +454,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     int fiscalYear,
     bool isDesktop,
   ) {
+    // StatCard自体がLayoutBuilderでカードの実測幅を計測し、
+    // パディング・アイコン・フォントサイズを自動でスケーリングするため、
+    // ここではPC/スマホでのGridView自体の見た目バランス(列間隔・
+    // アスペクト比)のみを調整すればよい。
     final cards = [
       StatCard(
         label: '自社事故',
@@ -470,12 +474,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _buildTargetRemainingCard(ownCompanyCount, companyTarget, fiscalYear),
     ];
     return GridView.count(
-      crossAxisCount: isDesktop ? 3 : 3,
+      crossAxisCount: 3,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
+      crossAxisSpacing: isDesktop ? 12 : 8,
       mainAxisSpacing: 12,
-      childAspectRatio: isDesktop ? 1.5 : 0.95,
+      // スマホ幅では横幅が狭くなる分、カードを少し縦長にして
+      // テキスト(特に2行になりうるlabel)の収まりを良くする。
+      childAspectRatio: isDesktop ? 1.5 : 0.82,
       children: cards,
     );
   }
