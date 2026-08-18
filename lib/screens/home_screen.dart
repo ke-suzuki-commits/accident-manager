@@ -4,6 +4,7 @@ import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
 import '../services/auth_service.dart';
 import '../services/migration_service.dart';
+import '../services/team_master_service.dart';
 import '../widgets/responsive_shell.dart';
 import 'dashboard_screen.dart';
 import 'accident_list_screen.dart';
@@ -36,11 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accidentService = context.read<AccidentService>();
       final targetService = context.read<AccidentTargetService>();
+      final teamMasterService = context.read<TeamMasterService>();
       await accidentService.loadRecords();
       if (accidentService.records.isEmpty) {
         await MigrationService().runIfNeeded(accidentService);
       }
       await targetService.loadTargets();
+      await teamMasterService.loadTeams();
     });
   }
 

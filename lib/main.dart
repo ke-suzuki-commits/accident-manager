@@ -13,6 +13,7 @@ import 'services/accident_service.dart';
 import 'services/accident_target_service.dart';
 import 'services/auth_service.dart';
 import 'services/settings_service.dart';
+import 'services/team_master_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/auth_gate.dart';
 
@@ -77,6 +78,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => AccidentTargetService()),
+        ChangeNotifierProvider(create: (_) => TeamMasterService()),
         ChangeNotifierProvider.value(value: settingsService),
       ],
       child: MaterialApp(

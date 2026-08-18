@@ -6,6 +6,7 @@ import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'employee_management_screen.dart';
 import 'target_setting_screen.dart';
+import 'team_master_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -166,6 +167,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const TargetSettingScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  _menuTile(
+                    context,
+                    icon: Icons.groups_rounded,
+                    label: '班編成管理',
+                    subtitle: '各班の班長・メンバーの登録',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TeamMasterScreen(),
                       ),
                     ),
                   ),

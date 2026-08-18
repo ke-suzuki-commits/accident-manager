@@ -9,6 +9,7 @@ import '../services/accident_service.dart';
 import '../services/ai_analysis_service.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
+import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/kana_normalize.dart';
 import 'accident_form_screen.dart';
@@ -372,10 +373,18 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   }
 
   Widget _buildInfoSection(AccidentRecord r) {
+    // 事故記録の「班」は発生時点のもの。現在の所属班は、班マスタと
+    // 運転者氏名を都度突き合わせて求める(事故記録自体は書き換えない)。
+    final currentTeam = r.driverName.trim().isEmpty
+        ? null
+        : context.watch<TeamMasterService>().findTeamByMemberName(
+            r.driverName,
+          );
     final rows = <(String, String)>[
       ('発生部署', r.office.label),
       ('発生区分（庸車/自社）', r.office.isCharter ? '庸車事故' : '自社事故'),
-      ('班', r.team.label),
+      ('班（発生時点）', r.team.label),
+      if (currentTeam != null) ('現在の所属班', currentTeam.label),
       ('責任区分', r.responsibility.label),
       if (r.partsCause != null) ('発生要因', r.partsCause!.label),
       ('氏名', r.driverName.isEmpty ? '-' : r.driverName),

@@ -5,6 +5,7 @@ import '../models/accident_master.dart';
 import '../models/accident_target.dart';
 import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
+import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/accident_list_tile.dart';
@@ -217,37 +218,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               for (final t in teamTargets)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: _targetProgressRow(
-                    label: Team.values
-                        .firstWhere(
-                          (team) => team.name == t.scope,
-                          orElse: () => Team.unassigned,
-                        )
-                        .label,
-                    current: context
-                        .read<AccidentService>()
-                        .countableByFiscalYear(fiscalYear)
-                        .where((r) => TargetScope.forTeam(r.team) == t.scope)
-                        .length,
-                    target: t.targetCount,
-                    // 班カードタップで、その班・その年度に絞り込んだ
-                    // 事故一覧へ遷移する。
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AccidentListScreen(
-                          initialYearFilter: fiscalYear,
-                          initialTeamFilter: Team.values.firstWhere(
-                            (team) => team.name == t.scope,
-                            orElse: () => Team.unassigned,
+                Consumer<TeamMasterService>(
+                  builder: (context, teamMasterService, _) {
+                    final team = Team.values.firstWhere(
+                      (team) => team.name == t.scope,
+                      orElse: () => Team.unassigned,
+                    );
+                    final leaderName = teamMasterService.leaderNameFor(team);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: _targetProgressRow(
+                        label: team.label,
+                        leaderName: leaderName,
+                        current: context
+                            .read<AccidentService>()
+                            .countableByFiscalYear(fiscalYear)
+                            .where(
+                              (r) => TargetScope.forTeam(r.team) == t.scope,
+                            )
+                            .length,
+                        target: t.targetCount,
+                        // 班カードタップで、その班・その年度に絞り込んだ
+                        // 事故一覧へ遷移する。
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AccidentListScreen(
+                              initialYearFilter: fiscalYear,
+                              initialTeamFilter: team,
+                              standalone: true,
+                            ),
                           ),
-                          standalone: true,
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
             ],
           ),
@@ -260,11 +265,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// (現場管理者が該当班の事故内容をすぐに確認できるようにするため)。
   Widget _targetProgressRow({
     required String label,
+    String? leaderName,
     required int current,
     required int target,
     VoidCallback? onTap,
   }) {
     if (target <= 0) return const SizedBox();
+    final hasLeader = (leaderName ?? '').trim().isNotEmpty;
     final ratio = (current / target).clamp(0.0, 1.5);
     final pct = (current / target * 100);
     Color color;
@@ -328,13 +335,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         Padding(
           padding: const EdgeInsets.only(left: 90, top: 2),
-          child: Text(
-            '${pct.toStringAsFixed(1)}%',
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+          child: Row(
+            children: [
+              Text(
+                '${pct.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (hasLeader) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '班長: $leaderName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
 import '../services/insight_engine.dart';
+import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
 import 'accident_detail_screen.dart';
 
@@ -319,6 +320,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _repeatOffenderTile(RepeatOffender offender) {
     final color = offender.count >= 3 ? AppColors.danger : AppColors.warning;
+    // 班マスタと氏名を都度突き合わせ、現在の所属班を求める
+    // (事故記録側の「班」は発生時点のものであり、現在の所属とは限らないため)。
+    final currentTeam = offender.driverName.trim().isEmpty
+        ? null
+        : context.watch<TeamMasterService>().findTeamByMemberName(
+            offender.driverName,
+          );
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -358,20 +366,37 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${offender.count}件',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${offender.count}件',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
                 ),
-              ),
+                if (currentTeam != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '現在: ${currentTeam.label}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           children: [

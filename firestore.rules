@@ -50,5 +50,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
+
+    // 班マスタ(現在の班長・メンバー構成)。閲覧は全員可、設定は管理者のみ。
+    match /team_masters/{teamId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
