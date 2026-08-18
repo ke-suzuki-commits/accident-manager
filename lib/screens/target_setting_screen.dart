@@ -7,6 +7,7 @@ import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/number_parse.dart';
 
 /// 年度事故件数目標(全社・班別)の設定画面。管理者のみアクセス可能。
 class TargetSettingScreen extends StatefulWidget {
@@ -86,14 +87,16 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
     final auth = context.read<AuthService>();
     final updatedBy = auth.currentUser?.name ?? '不明';
     try {
-      final companyCount = int.tryParse(_companyCtrl.text) ?? 0;
+      // 全角数字での入力(IME変換ミス等)でも正しく解釈できるよう、
+      // 全角→半角変換を含むparseIntOrNullを使用する。
+      final companyCount = parseIntOrNull(_companyCtrl.text) ?? 0;
       await targetService.setCompanyTarget(
         fiscalYear: _fiscalYear,
         targetCount: companyCount,
         updatedBy: updatedBy,
       );
       for (final entry in _teamCtrls.entries) {
-        final count = int.tryParse(entry.value.text) ?? 0;
+        final count = parseIntOrNull(entry.value.text) ?? 0;
         await targetService.setTeamTarget(
           fiscalYear: _fiscalYear,
           team: entry.key,

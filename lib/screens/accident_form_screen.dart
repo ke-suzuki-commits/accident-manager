@@ -6,6 +6,7 @@ import '../services/accident_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/kana_normalize.dart';
+import '../utils/number_parse.dart';
 
 class AccidentFormScreen extends StatefulWidget {
   final AccidentRecord? existing;
@@ -134,14 +135,18 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       location: normalizeHalfWidthKana(_locationCtrl.text.trim()),
       driverName: normalizeHalfWidthKana(_driverNameCtrl.text.trim()),
       employeeNumber: _employeeNumberCtrl.text.trim(),
-      age: int.tryParse(_ageCtrl.text),
-      yearsOfServiceYear: int.tryParse(_yearsOfServiceYearCtrl.text),
-      yearsOfServiceMonth: int.tryParse(_yearsOfServiceMonthCtrl.text),
+      age: parseIntOrNull(_ageCtrl.text),
+      yearsOfServiceYear: parseIntOrNull(_yearsOfServiceYearCtrl.text),
+      yearsOfServiceMonth: parseIntOrNull(_yearsOfServiceMonthCtrl.text),
       counterparty: normalizeHalfWidthKana(_counterpartyCtrl.text.trim()),
       description: normalizeHalfWidthKana(_descriptionCtrl.text.trim()),
       insurance: _insurance,
-      compensationAmount: double.tryParse(_compensationCtrl.text) ?? 0,
-      processingCost: double.tryParse(_processingCostCtrl.text) ?? 0,
+      // カンマ区切り(例:1,500,000)や全角数字での入力にも対応する
+      // parseAmountOrNullを使用する。ここでnullになることは通常
+      // 無いはずだが(下の_textFieldのvalidatorで事前に弾いているため)、
+      // 万一のフォールバックとして0円扱いにする。
+      compensationAmount: parseAmountOrNull(_compensationCtrl.text) ?? 0,
+      processingCost: parseAmountOrNull(_processingCostCtrl.text) ?? 0,
       causeAnalysis: existing?.causeAnalysis,
       status: existing?.status ?? RecordStatus.reported,
       isMigrated: existing?.isMigrated ?? false,
@@ -268,6 +273,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                     _ageCtrl,
                     '年齢',
                     keyboardType: TextInputType.number,
+                    isNumeric: true,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -277,6 +283,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                           _yearsOfServiceYearCtrl,
                           '勤続年数（年）',
                           keyboardType: TextInputType.number,
+                          isNumeric: true,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -285,6 +292,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                           _yearsOfServiceMonthCtrl,
                           '勤続年数（月）',
                           keyboardType: TextInputType.number,
+                          isNumeric: true,
                         ),
                       ),
                     ],
@@ -295,13 +303,15 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                   _textField(
                     _compensationCtrl,
                     '賠償金額（支払金額）',
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    isNumeric: true,
                   ),
                   const SizedBox(height: 12),
                   _textField(
                     _processingCostCtrl,
                     '事故処理諸費用',
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    isNumeric: true,
                   ),
                   const SizedBox(height: 12),
                   _dropdownField<InsuranceStatus>(
@@ -379,6 +389,11 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     int maxLines = 1,
     TextInputType? keyboardType,
     bool required = false,
+    // 金額・年齢等の数値項目であることを示すフラグ。trueの場合、
+    // カンマ区切りや全角数字であっても保存時に自動で解釈できるように
+    // helperTextで書式の案内を出し、かつ数値として解釈できない入力を
+    // 保存前にエラーとして弾く(黙って0円になる不具合の再発防止)。
+    bool isNumeric = false,
   }) {
     // 複数行の入力欄(maxLines > 1、例: 発生内容の詳細)は、スマホ等の狭い画面だと
     // 同じ文章でも折り返し行数が増え、固定行数のままでは入力中の文字が見切れる。
@@ -390,10 +405,23 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       minLines: isMultiline ? maxLines : 1,
       maxLines: isMultiline ? null : 1,
       keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
-      validator: required
-          ? (v) => (v == null || v.trim().isEmpty) ? '$labelを入力してください' : null
-          : null,
+      decoration: InputDecoration(
+        labelText: label,
+        // カンマ区切り入力は自動で解釈されることをその場で案内し、
+        // 誤入力(全角の単位混在等)にも気付きやすくする。
+        helperText: isNumeric ? '例: 1500000 または 1,500,000' : null,
+      ),
+      validator: (v) {
+        if (required && (v == null || v.trim().isEmpty)) {
+          return '$labelを入力してください';
+        }
+        if (isNumeric && v != null && v.trim().isNotEmpty) {
+          if (parseAmountOrNull(v) == null) {
+            return '$labelは数値で入力してください(例: 1500000)';
+          }
+        }
+        return null;
+      },
     );
   }
 
