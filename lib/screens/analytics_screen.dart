@@ -9,6 +9,7 @@ import '../services/accident_target_service.dart';
 import '../services/insight_engine.dart';
 import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/accident_no_badge.dart';
 import 'accident_detail_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -419,14 +420,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Text(
-              'No.${r.no}',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
-              ),
-            ),
+            AccidentNoBadge(record: r),
             const SizedBox(width: 10),
             Text(
               dateStr,

@@ -12,6 +12,7 @@ import '../services/settings_service.dart';
 import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/kana_normalize.dart';
+import '../widgets/accident_no_badge.dart';
 import 'accident_form_screen.dart';
 
 class AccidentDetailScreen extends StatefulWidget {
@@ -284,14 +285,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text(
-                'No.${r.no}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
+              AccidentNoBadge(record: r, fontSize: 13),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,

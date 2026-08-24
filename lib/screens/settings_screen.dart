@@ -54,8 +54,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('事故No.の振り直し'),
         content: const Text(
-          '登録されている全ての事故記録を、発生日時が古いものから順に'
-          'No.1から振り直します。\n\n'
+          '登録されている全ての事故記録を、「自社(有責)」「庸車(有責)」の'
+          '区分ごとに分けて、発生日時が古いものから順にNo.1から振り直します。\n'
+          '無責・責任区分不明の記録はNo.なし(採番対象外)になります。\n\n'
           'この操作は取り消せません。実行してよろしいですか？',
         ),
         actions: [

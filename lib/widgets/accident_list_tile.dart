@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/accident_record.dart';
 import '../theme/app_theme.dart';
+import 'accident_no_badge.dart';
 
 class AccidentListTile extends StatelessWidget {
   final AccidentRecord record;
@@ -64,14 +65,7 @@ class AccidentListTile extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          Text(
-                            'No.${record.no}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
+                          AccidentNoBadge(record: record),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,

@@ -48,7 +48,8 @@ class FieldChange {
 class EditLog {
   final String? id;
   final String recordId;
-  final int recordNo;
+  // 事故No.(区分別連番)。無責・責任区分不明の記録は採番対象外のためnull。
+  final int? recordNo;
   final EditAction action;
   final String editorUid;
   final String editorName;
@@ -103,7 +104,7 @@ class EditLog {
     return EditLog(
       id: id,
       recordId: (map['record_id'] as String?) ?? '',
-      recordNo: (map['record_no'] as num?)?.toInt() ?? 0,
+      recordNo: (map['record_no'] as num?)?.toInt(),
       action: EditAction.fromName(map['action'] as String?),
       editorUid: (map['editor_uid'] as String?) ?? '',
       editorName: (map['editor_name'] as String?) ?? '不明',

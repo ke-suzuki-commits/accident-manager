@@ -82,7 +82,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
           records = records
               .where(
                 (r) =>
-                    r.no.toString() == kw ||
+                    (r.no != null && r.no.toString() == kw) ||
                     r.location.toLowerCase().contains(kw) ||
                     r.description.toLowerCase().contains(kw) ||
                     r.driverName.toLowerCase().contains(kw) ||
@@ -102,10 +102,21 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
             records.sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
             break;
           case AccidentSortOrder.noDesc:
-            records.sort((a, b) => b.no.compareTo(a.no));
+            // No.が無い(無責・責任区分不明)記録は末尾に固定する。
+            records.sort((a, b) {
+              if (a.no == null && b.no == null) return 0;
+              if (a.no == null) return 1;
+              if (b.no == null) return -1;
+              return b.no!.compareTo(a.no!);
+            });
             break;
           case AccidentSortOrder.noAsc:
-            records.sort((a, b) => a.no.compareTo(b.no));
+            records.sort((a, b) {
+              if (a.no == null && b.no == null) return 0;
+              if (a.no == null) return 1;
+              if (b.no == null) return -1;
+              return a.no!.compareTo(b.no!);
+            });
             break;
         }
 

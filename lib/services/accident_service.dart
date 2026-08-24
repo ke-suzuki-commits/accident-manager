@@ -164,21 +164,49 @@ class AccidentService extends ChangeNotifier {
     }
   }
 
-  /// 登録済みの全事故記録を「発生日時が古いもの順」にNo.1から振り直す。
-  /// 手動採番のずれ・Excel移行データの不整合をまとめて解消するための
-  /// 管理者向け一括処理。実行後は自動でloadRecords()により再読込する。
+  /// 指定した採番区分(自社(有責)/庸車(有責))における、次に割り振るべきNo.を返す。
+  /// (現在登録済みの同区分の最大No. + 1。1件も無い場合は1)
+  int nextNoFor(NumberingCategory category) {
+    final maxNo = _records
+        .where((r) => r.numberingCategory == category)
+        .map((r) => r.no ?? 0)
+        .fold(0, (a, b) => a > b ? a : b);
+    return maxNo + 1;
+  }
+
+  /// 登録済みの全事故記録を、採番区分(自社(有責)/庸車(有責))ごとに分けて
+  /// 「発生日時が古いもの順」にNo.1から振り直す。
+  /// 無責・責任区分不明の記録はNo.なし(null)に統一する。
+  /// 手動採番のずれ・Excel移行データの不整合(旧仕様は区分を分けない単一連番
+  /// だったため)をまとめて解消するための管理者向け一括処理。
+  /// 実行後は自動でloadRecords()により再読込する。
   /// 戻り値: 実際に振り直した件数（No.に変更が無かった件を除く）。
   Future<int> renumberAllByOccurredAt() async {
     try {
-      final sorted = [..._records]
-        ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
       final updated = <AccidentRecord>[];
-      for (var i = 0; i < sorted.length; i++) {
-        final newNo = i + 1;
-        if (sorted[i].no != newNo) {
-          updated.add(sorted[i].copyWith(no: newNo, keepUpdatedAt: true));
+
+      // 採番区分(自社(有責)/庸車(有責))ごとに、発生日時が古い順にNo.1から振り直す。
+      for (final category in NumberingCategory.values) {
+        final sorted =
+            _records.where((r) => r.numberingCategory == category).toList()
+              ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
+        for (var i = 0; i < sorted.length; i++) {
+          final newNo = i + 1;
+          if (sorted[i].no != newNo) {
+            updated.add(sorted[i].copyWith(no: newNo, keepUpdatedAt: true));
+          }
         }
       }
+
+      // 無責・責任区分不明はNo.なし(null)に統一する。
+      // (copyWithはno:にnullを渡すと既存値を保持してしまう仕様のため、
+      //  ここだけは専用コンストラクタで明示的にnullを設定する)
+      for (final r in _records) {
+        if (r.numberingCategory == null && r.no != null) {
+          updated.add(_withNoCleared(r));
+        }
+      }
+
       if (updated.isNotEmpty) {
         await _repository.saveAll(updated);
         await loadRecords();
@@ -189,6 +217,46 @@ class AccidentService extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// 採番対象外(無責・責任区分不明)になった記録のNo.をnullに戻すための
+  /// ヘルパー。copyWithは「no: null」を渡しても既存値を保持する仕様
+  /// (他の項目のnull=変更なしと挙動を合わせているため)なので、
+  /// ここでは新規にAccidentRecordを組み立てて明示的にno=nullにする。
+  AccidentRecord _withNoCleared(AccidentRecord r) {
+    return AccidentRecord(
+      id: r.id,
+      no: null,
+      office: r.office,
+      team: r.team,
+      accidentType: r.accidentType,
+      responsibility: r.responsibility,
+      partsCause: r.partsCause,
+      occurredAt: r.occurredAt,
+      fiscalYear: r.fiscalYear,
+      fiscalMonth: r.fiscalMonth,
+      location: r.location,
+      employeeNumber: r.employeeNumber,
+      driverName: r.driverName,
+      age: r.age,
+      yearsOfServiceYear: r.yearsOfServiceYear,
+      yearsOfServiceMonth: r.yearsOfServiceMonth,
+      yearsOfExperienceYear: r.yearsOfExperienceYear,
+      yearsOfExperienceMonth: r.yearsOfExperienceMonth,
+      insurance: r.insurance,
+      compensationAmount: r.compensationAmount,
+      processingCost: r.processingCost,
+      counterparty: r.counterparty,
+      description: r.description,
+      causeAnalysis: r.causeAnalysis,
+      followUp: r.followUp,
+      status: r.status,
+      photoUrls: r.photoUrls,
+      isMigrated: r.isMigrated,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt, // keepUpdatedAt相当(機械的更新のため変更しない)
+    );
   }
 
   // ---------- 集計・分析用ヘルパー ----------

@@ -117,12 +117,32 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     final editorName = auth.currentUser?.name ?? '不明';
     final editorEmail = auth.currentUser?.email ?? '';
 
+    // 事故No.の採番区分(自社(有責)/庸車(有責))を、発生部署・責任区分の
+    // 入力内容から自動判定する。無責・責任区分不明はnull(採番対象外)。
+    final category = numberingCategoryOf(
+      office: _office,
+      responsibility: _responsibility,
+    );
+    int? no;
+    if (existing != null) {
+      // 編集時: 採番区分が変わっていなければ既存のNo.を維持する。
+      // 採番区分が変わった場合(例:責任区分を無責→有責に変更等)は、
+      // 新しい区分内での連番を新規に振り直す。
+      final existingCategory = existing.numberingCategory;
+      if (existingCategory == category) {
+        no = existing.no;
+      } else if (category == null) {
+        no = null; // 採番対象外に変わった
+      } else {
+        no = service.nextNoFor(category);
+      }
+    } else {
+      no = category == null ? null : service.nextNoFor(category);
+    }
+
     final record = AccidentRecord(
       id: existing?.id,
-      no:
-          existing?.no ??
-          (service.records.map((r) => r.no).fold(0, (a, b) => a > b ? a : b) +
-              1),
+      no: no,
       office: _office,
       team: _team,
       accidentType: _accidentType,

@@ -151,6 +151,30 @@ enum Responsibility {
   bool get isCountable => this == Responsibility.atFault;
 }
 
+/// 事故No.の採番区分。
+/// 役員要望により、事故No.は「自社(有責)」「庸車(有責)」の2区分に分けて
+/// それぞれ独立した連番を振る。無責・責任区分不明は採番対象外(No.なし)とする。
+enum NumberingCategory {
+  ownCompany('自社'),
+  charter('庸車');
+
+  final String label;
+  const NumberingCategory(this.label);
+}
+
+/// 発生部署(office)・責任区分(responsibility)の入力内容から、
+/// 事故No.の採番区分を自動判定する。
+/// 無責・責任区分不明の場合は採番対象外のためnullを返す。
+NumberingCategory? numberingCategoryOf({
+  required OfficeDept office,
+  required Responsibility responsibility,
+}) {
+  if (!responsibility.isCountable) return null; // 無責・責任区分不明は採番しない
+  return office.isCharter
+      ? NumberingCategory.charter
+      : NumberingCategory.ownCompany;
+}
+
 /// 保険適用有無
 enum InsuranceStatus {
   yes('有'),

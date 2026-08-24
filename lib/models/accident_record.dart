@@ -143,7 +143,10 @@ class FollowUpRecord {
 /// 事故記録メインエンティティ
 class AccidentRecord {
   final String id;
-  final int no; // Excel由来の管理番号(通番)
+  // 事故No.(自社(有責)/庸車(有責)の区分別連番)。
+  // 無責・責任区分不明の事故は採番対象外のためnull。
+  // (旧仕様では全区分共通の単一連番だったが、役員要望により区分別に変更)
+  final int? no;
   final OfficeDept office; // 発生部署
   final Team team; // 班（小集団活動の班単位）
   final AccidentType accidentType; // 発生区分
@@ -176,7 +179,7 @@ class AccidentRecord {
 
   AccidentRecord({
     String? id,
-    required this.no,
+    this.no,
     required this.office,
     this.team = Team.unassigned,
     required this.accidentType,
@@ -219,6 +222,11 @@ class AccidentRecord {
     return date.month >= 4 ? date.year : date.year - 1;
   }
 
+  /// 事故No.の採番区分(自社(有責)/庸車(有責))。
+  /// 無責・責任区分不明の場合はnull(採番対象外)。
+  NumberingCategory? get numberingCategory =>
+      numberingCategoryOf(office: office, responsibility: responsibility);
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'no': no,
@@ -256,7 +264,9 @@ class AccidentRecord {
   factory AccidentRecord.fromMap(Map<dynamic, dynamic> map) {
     return AccidentRecord(
       id: map['id'] as String?,
-      no: map['no'] as int? ?? 0,
+      // 旧仕様(全区分共通の単一連番)からの移行データも含め、(map['no'] as num?)で
+      // 数値として安全に読み取る。無責等でno未採番のデータはnullのまま保持する。
+      no: (map['no'] as num?)?.toInt(),
       office: OfficeDept.values.firstWhere(
         (e) => e.name == map['office'],
         orElse: () => OfficeDept.unknown,
