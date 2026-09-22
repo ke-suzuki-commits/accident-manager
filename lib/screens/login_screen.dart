@@ -87,7 +87,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   '社員アカウントでログインしてください',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -197,7 +198,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'アカウントの新規発行は管理者にご連絡ください。',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,

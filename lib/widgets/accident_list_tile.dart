@@ -131,7 +131,8 @@ class AccidentListTile extends StatelessWidget {
                             ? '(発生内容未記入)'
                             : record.description,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.textSecondary,
                         ),
                         maxLines: 1,
@@ -183,7 +184,8 @@ class AccidentListTile extends StatelessWidget {
                     Text(
                       record.driverName.isEmpty ? '-' : record.driverName,
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
                       ),
                     ),

@@ -93,20 +93,21 @@ class TeamMasterScreen extends StatelessWidget {
                   Text(
                     hasLeader ? '班長: ${master.leaderName}' : '班長: 未設定',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: hasLeader
                           ? AppColors.textSecondary
                           : AppColors.danger,
                       fontWeight: hasLeader
-                          ? FontWeight.normal
-                          : FontWeight.w600,
+                          ? FontWeight.w600
+                          : FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '所属人数: ${master.memberCount}名',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
                   ),

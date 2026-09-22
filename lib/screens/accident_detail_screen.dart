@@ -437,7 +437,8 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                       Text(
                         row.$1,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -445,7 +446,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
                       Text(
                         row.$2,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -505,7 +506,11 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 '※閲覧権限のため編集できません。',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           if (_record.causeAnalysis.isAiDraft)
@@ -513,7 +518,11 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 '※AI生成のドラフトです。内容を確認・修正のうえ保存してください。',
-                style: TextStyle(fontSize: 11, color: AppColors.warning),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.warning,
+                ),
               ),
             ),
           const SizedBox(height: 14),
@@ -575,7 +584,11 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
             padding: EdgeInsets.only(top: 4),
             child: Text(
               '担当課長による面談、および所属班でのミーティングの実施記録です。（任意項目）',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           if (!canEdit)
@@ -583,7 +596,11 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 '※閲覧権限のため編集できません。',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           const SizedBox(height: 14),

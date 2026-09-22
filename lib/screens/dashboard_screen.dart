@@ -164,7 +164,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text(
                     '$fiscalYear年度の事故目標が未設定です。設定画面(管理者)から登録できます。',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -194,7 +195,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text(
                     '※全社目標は自社事故のみが対象です（庸車事故は含みません）',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -353,7 +355,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
                   ),

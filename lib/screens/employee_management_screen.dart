@@ -83,7 +83,8 @@ class EmployeeManagementScreen extends StatelessWidget {
                                 const Text(
                                   '(自分)',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
@@ -93,7 +94,8 @@ class EmployeeManagementScreen extends StatelessWidget {
                           Text(
                             u.email,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                               color: AppColors.textSecondary,
                             ),
                           ),

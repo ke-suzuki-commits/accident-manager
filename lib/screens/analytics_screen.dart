@@ -47,7 +47,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 const Text(
                   '複数年度を選択して月別トレンドを比較できます',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -242,14 +243,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   item.title,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 15,
                     color: color,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   item.message,
-                  style: const TextStyle(fontSize: 12, height: 1.5),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                    height: 1.6,
+                  ),
                 ),
               ],
             ),
@@ -347,7 +353,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   offender.driverName.isEmpty ? '(氏名未入力)' : offender.driverName,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 15,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -358,7 +364,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 Text(
                   '社員番号: ${offender.employeeNumber}',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -392,7 +399,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   Text(
                     '現在: ${currentTeam.label}',
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -420,17 +428,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            AccidentNoBadge(record: r),
+            AccidentNoBadge(record: r, fontSize: 12),
             const SizedBox(width: 10),
             Text(
               dateStr,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 r.location.isEmpty ? '(場所未記入)' : r.location,
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

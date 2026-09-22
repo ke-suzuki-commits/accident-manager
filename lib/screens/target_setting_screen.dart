@@ -147,7 +147,8 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                   Text(
                     '現在の累計件数(自社事故のみ): $currentCompanyCount件',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -156,7 +157,8 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                     child: Text(
                       '（庸車事故 $charterCount件は目標の対象外・参考件数）',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.secondary,
                       ),
                     ),
@@ -167,7 +169,8 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                       child: Text(
                         '（無責・責任区分不明 $excludedCount件は集計対象外）',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.warning,
                         ),
                       ),
@@ -190,7 +193,8 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                   const Text(
                     '未設定のままにすると、その班は目標なしとして扱われます。',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -201,7 +205,8 @@ class _TargetSettingScreenState extends State<TargetSettingScreen> {
                         'N班・M班・O班は目標件数2件が初期入力されています。'
                         '内容を確認し「保存する」を押してください。',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.secondary,
                         ),
                       ),

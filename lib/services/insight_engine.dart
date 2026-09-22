@@ -215,30 +215,36 @@ class InsightEngine {
   ) {
     final target = targetService.companyTarget(fiscalYear);
     if (target == null || target.targetCount <= 0) return;
-    final currentCount = accidentService.byFiscalYear(fiscalYear).length;
+    // 全社目標に対する実績は「自社(有責)」事故のみで判定する(役員要望)。
+    // 目標件数自体が自社の事故削減を意図した数値であるため、
+    // 庸車事故・無責・責任区分不明を含めると実態より多く見えてしまい、
+    // 目標に対する進捗判断を誤らせる原因になっていた。
+    final currentCount = accidentService.ownCompanyAccidentCount(fiscalYear);
     final progress = currentCount / target.targetCount;
     final elapsed = fiscalYearElapsedFraction(fiscalYear);
     if (elapsed <= 0) return;
     if (progress > elapsed + 0.1) {
       insights.add(
         InsightItem(
-          title: '全社目標:ペースが早いおそれ',
+          title: '全社目標(自社有責):パースが早いおそれ',
           message:
-              '全社目標${target.targetCount}件に対し、既に$currentCount件'
+              '全社目標${target.targetCount}件(自社有責事故のみ)に対し、既に$currentCount件'
               '(${(progress * 100).toStringAsFixed(1)}%)発生しています。'
-              '年度の経過(${(elapsed * 100).toStringAsFixed(0)}%)に対して発生ペースが速く、'
-              'このままでは目標超過のおそれがあります。',
+              '年度の経過(${(elapsed * 100).toStringAsFixed(0)}%)に対して発生パースが速く、'
+              'このままでは目標超過のおそれがあります。'
+              '(※庸車事故・無責・責任区分不明は含みません)',
           severity: InsightSeverity.danger,
         ),
       );
     } else {
       insights.add(
         InsightItem(
-          title: '全社目標:順調なペース',
+          title: '全社目標(自社有責):順調なパース',
           message:
-              '全社目標${target.targetCount}件に対し、現在$currentCount件'
+              '全社目標${target.targetCount}件(自社有責事故のみ)に対し、現在$currentCount件'
               '(${(progress * 100).toStringAsFixed(1)}%)。'
-              '年度の経過(${(elapsed * 100).toStringAsFixed(0)}%)に対して概ね順調なペースです。',
+              '年度の経過(${(elapsed * 100).toStringAsFixed(0)}%)に対して概ね順調なパースです。'
+              '(※庸車事故・無責・責任区分不明は含みません)',
           severity: InsightSeverity.positive,
         ),
       );
