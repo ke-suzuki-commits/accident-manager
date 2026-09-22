@@ -35,6 +35,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int? _reportFiscalYear;
   int _reportMonth = DateTime.now().month;
   bool _isGeneratingReport = false;
+  // 生成済みPDFのキャッシュ(再度AI呼び出しをせずに「表示」「ダウンロード」の
+  // 両操作を行えるようにするため保持する)。
+  Uint8List? _lastPdfBytes;
+  String? _lastPdfFilename;
 
   @override
   Widget build(BuildContext context) {
@@ -216,8 +220,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               else
                 _reportMonthYearDropdown(availableYears),
               _reportGenerateButton(service),
+              if (_lastPdfBytes != null) _reportDownloadButton(),
             ],
           ),
+          if (_lastPdfBytes != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'PDF生成済み: $_lastPdfFilename '
+                    '(条件を変更した場合は再度「PDFレポートを出力」を押してください)',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -244,7 +273,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final selected = _reportMode == mode;
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: () => setState(() => _reportMode = mode),
+      onTap: () => setState(() {
+        _reportMode = mode;
+        _lastPdfBytes = null;
+        _lastPdfFilename = null;
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -278,7 +311,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           for (final y in years)
             DropdownMenuItem(value: y, child: Text('$y年度')),
         ],
-        onChanged: (v) => setState(() => _reportFiscalYear = v),
+        onChanged: (v) => setState(() {
+          _reportFiscalYear = v;
+          _lastPdfBytes = null;
+          _lastPdfFilename = null;
+        }),
       ),
     );
   }
@@ -302,7 +339,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               for (final y in years)
                 DropdownMenuItem(value: y, child: Text('$y年度')),
             ],
-            onChanged: (v) => setState(() => _reportFiscalYear = v),
+            onChanged: (v) => setState(() {
+              _reportFiscalYear = v;
+              _lastPdfBytes = null;
+              _lastPdfFilename = null;
+            }),
           ),
         ),
         const SizedBox(width: 8),
@@ -320,7 +361,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               for (final m in fiscalMonthOrder)
                 DropdownMenuItem(value: m, child: Text('$m月')),
             ],
-            onChanged: (v) => setState(() => _reportMonth = v!),
+            onChanged: (v) => setState(() {
+              _reportMonth = v!;
+              _lastPdfBytes = null;
+              _lastPdfFilename = null;
+            }),
           ),
         ),
       ],
@@ -356,12 +401,50 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 color: AppColors.secondary,
               ),
             )
-          : const Icon(Icons.download_rounded, size: 18),
+          : const Icon(Icons.auto_awesome_rounded, size: 18),
       label: Text(
         _isGeneratingReport ? 'AI分析中...(数秒お待ちください)' : 'PDFレポートを出力',
         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
       ),
     );
+  }
+
+  /// 生成済みPDFをブラウザ経由でファイルとしてダウンロード保存する。
+  /// (Web版の`Printing.sharePdf`は`<a download>`によるファイル保存として
+  ///  動作するため、印刷/プレビュー用の`layoutPdf`とは別に用意する。)
+  Widget _reportDownloadButton() {
+    return OutlinedButton.icon(
+      onPressed: () => _downloadPdf(),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: const BorderSide(color: Colors.white, width: 1.4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      icon: const Icon(Icons.save_alt_rounded, size: 18),
+      label: const Text(
+        'PDFをダウンロード保存',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+      ),
+    );
+  }
+
+  Future<void> _downloadPdf() async {
+    final bytes = _lastPdfBytes;
+    final filename = _lastPdfFilename;
+    if (bytes == null || filename == null) return;
+    try {
+      await Printing.sharePdf(bytes: bytes, filename: filename);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDFのダウンロードに失敗しました: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _generateReport(AccidentService service) async {
@@ -384,10 +467,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         data: data,
         aiSuggestion: aiSuggestion,
       );
+      final pdfBytes = Uint8List.fromList(bytes);
+      final filename = '事故分析レポート_${data.periodLabel}.pdf';
       if (!mounted) return;
+      setState(() {
+        _lastPdfBytes = pdfBytes;
+        _lastPdfFilename = filename;
+      });
       await Printing.layoutPdf(
-        onLayout: (_) async => Uint8List.fromList(bytes),
-        name: '事故分析レポート_${data.periodLabel}.pdf',
+        onLayout: (_) async => pdfBytes,
+        name: filename,
         format: PdfPageFormat.a3.landscape,
       );
       if (mounted && aiSuggestion.isFallback && settings.hasApiKey) {
