@@ -353,6 +353,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text(
                     '班長: $leaderName',
                     maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 13,

@@ -101,6 +101,9 @@ class TeamMasterScreen extends StatelessWidget {
                           ? FontWeight.w600
                           : FontWeight.w700,
                     ),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(

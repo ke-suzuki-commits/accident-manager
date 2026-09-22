@@ -362,6 +362,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     fontSize: 15,
                   ),
                   maxLines: 1,
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

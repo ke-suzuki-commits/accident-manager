@@ -181,8 +181,12 @@ class AccidentListTile extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
+                    // 発生者名が長い場合でも、氏名の途中で不自然に改行されて
+                    // しまわないよう1行固定にし、収まらない分は末尾を
+                    // 「…」で省略する(2行折り返しだと、例えば「田中」「太郎」の
+                    // ように氏と名の間で不自然に分割されて見づらくなるため)。
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 90),
+                      constraints: const BoxConstraints(maxWidth: 110),
                       child: Text(
                         record.involvedNamesText.isEmpty
                             ? '-'
@@ -193,7 +197,8 @@ class AccidentListTile extends StatelessWidget {
                           color: AppColors.textSecondary,
                         ),
                         textAlign: TextAlign.right,
-                        maxLines: 2,
+                        maxLines: 1,
+                        softWrap: false,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
