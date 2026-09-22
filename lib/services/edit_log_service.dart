@@ -157,7 +157,7 @@ class EditLogService {
     if (persons.isEmpty) return '';
     return persons.map((p) {
       final name = p.name.isEmpty ? '(氏名未入力)' : p.name;
-      final details = <String>[];
+      final details = <String>['役職:${p.role.label}'];
       if (p.employeeNumber.isNotEmpty) {
         details.add('社員番号:${p.employeeNumber}');
       }

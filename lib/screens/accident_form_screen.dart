@@ -437,6 +437,14 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
             ],
           ),
           const SizedBox(height: 10),
+          _dropdownField<PersonRole>(
+            label: '役職/立場',
+            value: data.role,
+            items: PersonRole.values,
+            itemLabel: (e) => e.label,
+            onChanged: (v) => setState(() => data.role = v!),
+          ),
+          const SizedBox(height: 12),
           _textField(data.nameCtrl, '氏名'),
           const SizedBox(height: 12),
           _textField(data.employeeNumberCtrl, '社員番号'),
@@ -578,6 +586,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
 /// 相互変換を担う。
 class _PersonFormData {
   final TextEditingController nameCtrl;
+  PersonRole role;
   final TextEditingController employeeNumberCtrl;
   final TextEditingController ageCtrl;
   final TextEditingController yearsOfServiceYearCtrl;
@@ -585,6 +594,7 @@ class _PersonFormData {
 
   _PersonFormData({
     String name = '',
+    this.role = PersonRole.driver,
     String employeeNumber = '',
     String age = '',
     String yearsOfServiceYear = '',
@@ -600,6 +610,7 @@ class _PersonFormData {
   factory _PersonFormData.fromPerson(PersonInvolved p) {
     return _PersonFormData(
       name: p.name,
+      role: p.role,
       employeeNumber: p.employeeNumber,
       age: p.age?.toString() ?? '',
       yearsOfServiceYear: p.yearsOfServiceYear?.toString() ?? '',
@@ -610,6 +621,7 @@ class _PersonFormData {
   PersonInvolved toPerson() {
     return PersonInvolved(
       name: normalizeHalfWidthKana(nameCtrl.text.trim()),
+      role: role,
       employeeNumber: employeeNumberCtrl.text.trim(),
       age: parseIntOrNull(ageCtrl.text),
       yearsOfServiceYear: parseIntOrNull(yearsOfServiceYearCtrl.text),

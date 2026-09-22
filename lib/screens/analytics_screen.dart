@@ -380,7 +380,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Row(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -400,8 +403,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                 ),
-                if (currentTeam != null) ...[
-                  const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    offender.role.label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                if (currentTeam != null)
                   Text(
                     '現在: ${currentTeam.label}',
                     style: const TextStyle(
@@ -410,7 +430,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                ],
               ],
             ),
           ),

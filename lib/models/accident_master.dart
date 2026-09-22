@@ -175,6 +175,28 @@ NumberingCategory? numberingCategoryOf({
       : NumberingCategory.ownCompany;
 }
 
+/// 発生者(起因者)の役職/立場区分。
+/// 事故はドライバーに限らず、事務員・倉庫作業者・管理者(管理監督者)が
+/// 起こす場合もあるため、発生者ごとに役職を記録し、傾向分析で
+/// 「作業内容別の事故傾向」を把握できるようにするための分類軸。
+enum PersonRole {
+  driver('運転者'),
+  officeStaff('事務員'),
+  warehouseWorker('倉庫作業者'),
+  manager('管理者');
+
+  final String label;
+  const PersonRole(this.label);
+
+  static PersonRole fromLabel(String? label) {
+    if (label == null) return PersonRole.driver;
+    return PersonRole.values.firstWhere(
+      (e) => e.label == label,
+      orElse: () => PersonRole.driver,
+    );
+  }
+}
+
 /// 保険適用有無
 enum InsuranceStatus {
   yes('有'),

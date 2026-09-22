@@ -472,6 +472,7 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
         ? null
         : context.watch<TeamMasterService>().findTeamByMemberName(p.name);
     final rows = <(String, String)>[
+      ('役職/立場', p.role.label),
       ('氏名', p.name.isEmpty ? '-' : p.name),
       ('社員番号', p.employeeNumber.isEmpty ? '-' : p.employeeNumber),
       if (currentTeam != null) ('現在の所属班', currentTeam.label),

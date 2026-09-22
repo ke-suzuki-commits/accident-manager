@@ -9,11 +9,13 @@ import 'edit_log_service.dart';
 /// 社員番号があればそれをキーに、無ければ氏名をキーにグルーピングする。
 class RepeatOffender {
   final String name;
+  final PersonRole role; // 役職/立場(運転者・事務員・倉庫作業者・管理者)
   final String employeeNumber;
   final List<AccidentRecord> records; // 発生日時が新しい順
 
   RepeatOffender({
     required this.name,
+    required this.role,
     required this.employeeNumber,
     required this.records,
   });
@@ -488,6 +490,7 @@ class AccidentService extends ChangeNotifier {
       result.add(
         RepeatOffender(
           name: latest.name.trim(),
+          role: latest.role,
           employeeNumber: latest.employeeNumber.trim(),
           records: sorted,
         ),

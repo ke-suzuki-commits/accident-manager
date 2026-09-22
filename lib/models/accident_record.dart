@@ -10,6 +10,7 @@ import '../utils/kana_normalize.dart';
 /// 複数名保持する。
 class PersonInvolved {
   final String name; // 氏名
+  final PersonRole role; // 役職/立場(運転者・事務員・倉庫作業者・管理者)
   final String employeeNumber; // 社員番号
   final int? age; // 年齢
   final int? yearsOfServiceYear; // 勤続年数(年)
@@ -19,6 +20,7 @@ class PersonInvolved {
 
   const PersonInvolved({
     this.name = '',
+    this.role = PersonRole.driver,
     this.employeeNumber = '',
     this.age,
     this.yearsOfServiceYear,
@@ -27,6 +29,8 @@ class PersonInvolved {
     this.yearsOfExperienceMonth,
   });
 
+  // 注: roleは常にデフォルト値(運転者)を持つため、単体での選択のみでは
+  // 「入力済み」とは判定しない(氏名等が全て未入力の場合は依然として空発生者欄として扱う)。
   bool get isEmpty =>
       name.isEmpty &&
       employeeNumber.isEmpty &&
@@ -38,6 +42,7 @@ class PersonInvolved {
 
   Map<String, dynamic> toMap() => {
     'name': name,
+    'role': role.name,
     'employeeNumber': employeeNumber,
     'age': age,
     'yearsOfServiceYear': yearsOfServiceYear,
@@ -51,6 +56,13 @@ class PersonInvolved {
       // 半角カタカナの濁点/半濁点による文字化け(豆腐表示)を防ぐため、
       // 読み込み時に全角へ正規化する。
       name: normalizeHalfWidthKana(map['name'] as String? ?? ''),
+      // 旧データ(役職導入以前の発生者)にはroleが存在しないため、
+      // その場合は「運転者」として扱う(後方互換。従来の集計対象が
+      // すべて運転者の事故であったため、従来の集計結果を変えないようにする目的)。
+      role: PersonRole.values.firstWhere(
+        (e) => e.name == map['role'],
+        orElse: () => PersonRole.driver,
+      ),
       employeeNumber: map['employeeNumber'] as String? ?? '',
       age: map['age'] as int?,
       yearsOfServiceYear: map['yearsOfServiceYear'] as int?,
@@ -62,6 +74,7 @@ class PersonInvolved {
 
   PersonInvolved copyWith({
     String? name,
+    PersonRole? role,
     String? employeeNumber,
     int? age,
     int? yearsOfServiceYear,
@@ -71,6 +84,7 @@ class PersonInvolved {
   }) {
     return PersonInvolved(
       name: name ?? this.name,
+      role: role ?? this.role,
       employeeNumber: employeeNumber ?? this.employeeNumber,
       age: age ?? this.age,
       yearsOfServiceYear: yearsOfServiceYear ?? this.yearsOfServiceYear,
