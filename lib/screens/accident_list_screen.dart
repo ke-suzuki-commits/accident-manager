@@ -43,6 +43,7 @@ class AccidentListScreen extends StatefulWidget {
 
 class _AccidentListScreenState extends State<AccidentListScreen> {
   int? _yearFilter;
+  int? _monthFilter; // fiscalMonth(1-12)。年度フィルターと併用可能。
   AccidentType? _typeFilter;
   OfficeDept? _officeFilter;
   Team? _teamFilter;
@@ -65,6 +66,11 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
 
         if (_yearFilter != null) {
           records = records.where((r) => r.fiscalYear == _yearFilter).toList();
+        }
+        if (_monthFilter != null) {
+          records = records
+              .where((r) => r.fiscalMonth == _monthFilter)
+              .toList();
         }
         if (_typeFilter != null) {
           records = records
@@ -157,6 +163,8 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                         ),
                         const SizedBox(width: 8),
                         _filterDropdownYear(service.availableFiscalYears),
+                        const SizedBox(width: 8),
+                        _filterDropdownMonth(),
                         const SizedBox(width: 8),
                         _filterDropdownType(),
                         const SizedBox(width: 8),
@@ -288,6 +296,33 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
       itemLabel: (y) => '$y年度',
       onSelected: (v) => setState(() => _yearFilter = v),
       onClear: () => setState(() => _yearFilter = null),
+    );
+  }
+
+  // 年度(4月始まり)の運用に合わせ、4月→翌3月の順で月を並べる。
+  static const List<int> _fiscalMonthOrder = [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    1,
+    2,
+    3,
+  ];
+
+  Widget _filterDropdownMonth() {
+    return _FilterChipDropdown<int>(
+      label: _monthFilter == null ? '月' : '$_monthFilter月',
+      selected: _monthFilter != null,
+      items: _fiscalMonthOrder,
+      itemLabel: (m) => '$m月',
+      onSelected: (v) => setState(() => _monthFilter = v),
+      onClear: () => setState(() => _monthFilter = null),
     );
   }
 

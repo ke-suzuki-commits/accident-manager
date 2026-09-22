@@ -40,6 +40,7 @@ class InsightEngine {
     _addSameMonthInsight(insights, accidentService, fiscalYear);
     _addTeamInsight(insights, accidentService, fiscalYear);
     _addTypeInsight(insights, accidentService, fiscalYear);
+    _addPartsCauseInsight(insights, accidentService, fiscalYear);
     _addCharterInsight(insights, accidentService, fiscalYear);
     _addTargetProgressInsight(
       insights,
@@ -179,6 +180,33 @@ class InsightEngine {
       InsightItem(
         title: '最も多い発生区分',
         message: '「${top.key.label}」が$fiscalYear年度累計${top.value}件と最も多く発生しています。',
+        severity: InsightSeverity.info,
+      ),
+    );
+  }
+
+  /// 部品事故の発生要因のうち、最も多いものを表示する。
+  /// (発生区分＝部品事故の記録にのみ設定される項目のため、
+  ///  部品事故が0件の年度・全体集計では非表示にする)
+  static void _addPartsCauseInsight(
+    List<InsightItem> insights,
+    AccidentService service,
+    int fiscalYear,
+  ) {
+    final breakdown = service.partsCauseBreakdown(fiscalYear);
+    if (breakdown.isEmpty) return;
+    final totalPartsCount = breakdown.values.fold(0, (a, b) => a + b);
+    final sorted = breakdown.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.first;
+    final pct = top.value / totalPartsCount * 100;
+    insights.add(
+      InsightItem(
+        title: '最も多い発生要因(部品事故)',
+        message:
+            '部品事故($fiscalYear年度累計$totalPartsCount件)のうち、'
+            '「${top.key.label}」が${top.value}件(${pct.toStringAsFixed(1)}%)と'
+            '最も多く発生しています。',
         severity: InsightSeverity.info,
       ),
     );

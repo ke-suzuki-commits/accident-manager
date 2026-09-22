@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../models/accident_master.dart';
 import '../models/accident_record.dart';
@@ -7,6 +11,10 @@ import 'package:intl/intl.dart';
 import '../services/accident_service.dart';
 import '../services/accident_target_service.dart';
 import '../services/insight_engine.dart';
+import '../services/report_ai_service.dart';
+import '../services/report_data.dart';
+import '../services/report_pdf_generator.dart';
+import '../services/settings_service.dart';
 import '../services/team_master_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/accident_no_badge.dart';
@@ -21,6 +29,12 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final Set<int> _selectedYears = {};
+
+  // ---- PDFレポート出力(A3横向き分析レポート)関連の状態 ----
+  ReportMode _reportMode = ReportMode.fiscalYear;
+  int? _reportFiscalYear;
+  int _reportMonth = DateTime.now().month;
+  bool _isGeneratingReport = false;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +68,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 14),
                 _buildYearMultiSelect(years),
+                const SizedBox(height: 24),
+                _buildReportExportSection(service, years),
                 const SizedBox(height: 24),
                 _sectionTitle('AIによる傾向分析'),
                 const SizedBox(height: 12),
@@ -133,6 +149,278 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
       ],
     );
+  }
+
+  /// PDF分析レポート出力(A3横向き・単月/年度選択・AIによる事故削減提案付き)。
+  /// 【対象】常に全事業所・全班(3ヶ月に1回の事故報告会での使用を想定)。
+  /// 【対象プラットフォーム】PC専用機能のため、モバイル表示でも非表示にしない。
+  Widget _buildReportExportSection(AccidentService service, List<int> years) {
+    _reportFiscalYear ??= years.isNotEmpty
+        ? years.first
+        : AccidentRecord.calcFiscalYear(DateTime.now());
+    final availableYears = years.isNotEmpty
+        ? years
+        : [_reportFiscalYear!];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.picture_as_pdf_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'A3分析レポート出力(事故報告会用)',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '全事業所・全班を対象に、統計データとAI(Gemini)による多角的分析・'
+            '事故削減提案をA3横向きPDFで出力します。',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _reportModeToggle(),
+              if (_reportMode == ReportMode.fiscalYear)
+                _reportYearDropdown(availableYears)
+              else
+                _reportMonthYearDropdown(availableYears),
+              _reportGenerateButton(service),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportModeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _reportModeButton('年度', ReportMode.fiscalYear),
+          _reportModeButton('単月', ReportMode.month),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportModeButton(String label, ReportMode mode) {
+    final selected = _reportMode == mode;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => setState(() => _reportMode = mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.secondary : Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _reportYearDropdown(List<int> years) {
+    return _reportDropdownShell(
+      child: DropdownButton<int>(
+        value: _reportFiscalYear,
+        underline: const SizedBox(),
+        dropdownColor: Colors.white,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+        items: [
+          for (final y in years)
+            DropdownMenuItem(value: y, child: Text('$y年度')),
+        ],
+        onChanged: (v) => setState(() => _reportFiscalYear = v),
+      ),
+    );
+  }
+
+  Widget _reportMonthYearDropdown(List<int> years) {
+    const fiscalMonthOrder = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _reportDropdownShell(
+          child: DropdownButton<int>(
+            value: _reportFiscalYear,
+            underline: const SizedBox(),
+            dropdownColor: Colors.white,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            items: [
+              for (final y in years)
+                DropdownMenuItem(value: y, child: Text('$y年度')),
+            ],
+            onChanged: (v) => setState(() => _reportFiscalYear = v),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _reportDropdownShell(
+          child: DropdownButton<int>(
+            value: _reportMonth,
+            underline: const SizedBox(),
+            dropdownColor: Colors.white,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            items: [
+              for (final m in fiscalMonthOrder)
+                DropdownMenuItem(value: m, child: Text('$m月')),
+            ],
+            onChanged: (v) => setState(() => _reportMonth = v!),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _reportDropdownShell({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _reportGenerateButton(AccidentService service) {
+    return ElevatedButton.icon(
+      onPressed: _isGeneratingReport ? null : () => _generateReport(service),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.secondary,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      icon: _isGeneratingReport
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.secondary,
+              ),
+            )
+          : const Icon(Icons.download_rounded, size: 18),
+      label: Text(
+        _isGeneratingReport ? 'AI分析中...(数秒お待ちください)' : 'PDFレポートを出力',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+      ),
+    );
+  }
+
+  Future<void> _generateReport(AccidentService service) async {
+    final settings = context.read<SettingsService>();
+    final targetService = context.read<AccidentTargetService>();
+    setState(() => _isGeneratingReport = true);
+    try {
+      final data = ReportDataBuilder.build(
+        accidentService: service,
+        targetService: targetService,
+        mode: _reportMode,
+        fiscalYear: _reportFiscalYear!,
+        month: _reportMode == ReportMode.month ? _reportMonth : null,
+      );
+      final aiSuggestion = await ReportAiService().generateSuggestion(
+        apiKey: settings.geminiApiKey,
+        data: data,
+      );
+      final bytes = await ReportPdfGenerator.generate(
+        data: data,
+        aiSuggestion: aiSuggestion,
+      );
+      if (!mounted) return;
+      await Printing.layoutPdf(
+        onLayout: (_) async => Uint8List.fromList(bytes),
+        name: '事故分析レポート_${data.periodLabel}.pdf',
+        format: PdfPageFormat.a3.landscape,
+      );
+      if (mounted && aiSuggestion.isFallback && settings.hasApiKey) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'AI(Gemini)による提案生成に失敗したため、統計ベースの提案で出力しました。',
+            ),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      } else if (mounted && !settings.hasApiKey) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Gemini APIキーが未設定のため、統計ベースの提案でPDFを出力しました。'
+              '(設定画面でAPIキーを登録すると、AIによる提案が利用できます)',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDFの生成に失敗しました: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGeneratingReport = false);
+    }
   }
 
   /// AIによる傾向分析(ルールベース統計エンジン)。当年度を基準に分析する。
