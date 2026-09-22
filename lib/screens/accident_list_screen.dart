@@ -85,7 +85,7 @@ class _AccidentListScreenState extends State<AccidentListScreen> {
                     (r.no != null && r.no.toString() == kw) ||
                     r.location.toLowerCase().contains(kw) ||
                     r.description.toLowerCase().contains(kw) ||
-                    r.driverName.toLowerCase().contains(kw) ||
+                    r.involvedNamesText.toLowerCase().contains(kw) ||
                     r.counterparty.toLowerCase().contains(kw),
               )
               .toList();

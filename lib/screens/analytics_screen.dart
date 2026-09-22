@@ -315,8 +315,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const Text(
             '氏名（未入力の場合は社員番号）を基準に、有責の事故を複数回起こしている方を'
             '件数が多い順に表示しています（無責・責任区分不明の事故は含みません）。'
-            '安全教育・面談の優先対象の把握にご活用ください。',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.5),
+            '1件の事故に発生者が複数名登録されている場合は、その事故が各発生者の'
+            '件数として集計されます。安全教育・面談の優先対象の把握にご活用ください。',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 14),
           for (final o in offenders) _repeatOffenderTile(o),
@@ -329,10 +335,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final color = offender.count >= 3 ? AppColors.danger : AppColors.warning;
     // 班マスタと氏名を都度突き合わせ、現在の所属班を求める
     // (事故記録側の「班」は発生時点のものであり、現在の所属とは限らないため)。
-    final currentTeam = offender.driverName.trim().isEmpty
+    final currentTeam = offender.name.trim().isEmpty
         ? null
         : context.watch<TeamMasterService>().findTeamByMemberName(
-            offender.driverName,
+            offender.name,
           );
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -350,7 +356,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  offender.driverName.isEmpty ? '(氏名未入力)' : offender.driverName,
+                  offender.name.isEmpty ? '(氏名未入力)' : offender.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,

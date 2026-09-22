@@ -2,6 +2,87 @@ import 'package:uuid/uuid.dart';
 import 'accident_master.dart';
 import '../utils/kana_normalize.dart';
 
+/// 事故の発生者(起因者)情報1名分。
+/// ドライバーだけでなく、事務員・倉庫作業者等が事故を発生させる
+/// ケースもあるため「発生者」という中立的な名称にしている。
+/// また、起因者が複数名にわたる事故(例: 積み込み作業での複数人の連携ミス等)
+/// にも対応するため、AccidentRecord側ではこれを`List<PersonInvolved>`として
+/// 複数名保持する。
+class PersonInvolved {
+  final String name; // 氏名
+  final String employeeNumber; // 社員番号
+  final int? age; // 年齢
+  final int? yearsOfServiceYear; // 勤続年数(年)
+  final int? yearsOfServiceMonth; // 勤続年数(月)
+  final int? yearsOfExperienceYear; // 業務経験年数(年)
+  final int? yearsOfExperienceMonth; // 業務経験年数(月)
+
+  const PersonInvolved({
+    this.name = '',
+    this.employeeNumber = '',
+    this.age,
+    this.yearsOfServiceYear,
+    this.yearsOfServiceMonth,
+    this.yearsOfExperienceYear,
+    this.yearsOfExperienceMonth,
+  });
+
+  bool get isEmpty =>
+      name.isEmpty &&
+      employeeNumber.isEmpty &&
+      age == null &&
+      yearsOfServiceYear == null &&
+      yearsOfServiceMonth == null &&
+      yearsOfExperienceYear == null &&
+      yearsOfExperienceMonth == null;
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'employeeNumber': employeeNumber,
+    'age': age,
+    'yearsOfServiceYear': yearsOfServiceYear,
+    'yearsOfServiceMonth': yearsOfServiceMonth,
+    'yearsOfExperienceYear': yearsOfExperienceYear,
+    'yearsOfExperienceMonth': yearsOfExperienceMonth,
+  };
+
+  factory PersonInvolved.fromMap(Map<dynamic, dynamic> map) {
+    return PersonInvolved(
+      // 半角カタカナの濁点/半濁点による文字化け(豆腐表示)を防ぐため、
+      // 読み込み時に全角へ正規化する。
+      name: normalizeHalfWidthKana(map['name'] as String? ?? ''),
+      employeeNumber: map['employeeNumber'] as String? ?? '',
+      age: map['age'] as int?,
+      yearsOfServiceYear: map['yearsOfServiceYear'] as int?,
+      yearsOfServiceMonth: map['yearsOfServiceMonth'] as int?,
+      yearsOfExperienceYear: map['yearsOfExperienceYear'] as int?,
+      yearsOfExperienceMonth: map['yearsOfExperienceMonth'] as int?,
+    );
+  }
+
+  PersonInvolved copyWith({
+    String? name,
+    String? employeeNumber,
+    int? age,
+    int? yearsOfServiceYear,
+    int? yearsOfServiceMonth,
+    int? yearsOfExperienceYear,
+    int? yearsOfExperienceMonth,
+  }) {
+    return PersonInvolved(
+      name: name ?? this.name,
+      employeeNumber: employeeNumber ?? this.employeeNumber,
+      age: age ?? this.age,
+      yearsOfServiceYear: yearsOfServiceYear ?? this.yearsOfServiceYear,
+      yearsOfServiceMonth: yearsOfServiceMonth ?? this.yearsOfServiceMonth,
+      yearsOfExperienceYear:
+          yearsOfExperienceYear ?? this.yearsOfExperienceYear,
+      yearsOfExperienceMonth:
+          yearsOfExperienceMonth ?? this.yearsOfExperienceMonth,
+    );
+  }
+}
+
 /// なぜなぜ分析（4回）＋真因
 class CauseAnalysis {
   final String why1;
@@ -156,13 +237,10 @@ class AccidentRecord {
   final int fiscalYear; // 年度（4月始まり）
   final int fiscalMonth; // 発生月（1-12）
   final String location; // 発生場所
-  final String employeeNumber; // 社員番号
-  final String driverName; // 名前
-  final int? age; // 年齢
-  final int? yearsOfServiceYear; // 勤続年数(年)
-  final int? yearsOfServiceMonth; // 勤続年数(月)
-  final int? yearsOfExperienceYear; // 業務経験年数(年)
-  final int? yearsOfExperienceMonth; // 業務経験年数(月)
+  // 発生者(起因者)情報。ドライバーに限らず事務員・倉庫作業者等も対象と
+  // なるため「発生者」という中立的な名称にしている。起因者が複数名の
+  // 場合(例:複数人の連携ミス)にも対応するためリストで保持する。
+  final List<PersonInvolved> involvedPersons;
   final InsuranceStatus insurance; // 保険有無
   final double compensationAmount; // 賠償金額(支払金額)
   final double processingCost; // 事故処理諸費用
@@ -189,13 +267,7 @@ class AccidentRecord {
     int? fiscalYear,
     int? fiscalMonth,
     this.location = '',
-    this.employeeNumber = '',
-    this.driverName = '',
-    this.age,
-    this.yearsOfServiceYear,
-    this.yearsOfServiceMonth,
-    this.yearsOfExperienceYear,
-    this.yearsOfExperienceMonth,
+    List<PersonInvolved>? involvedPersons,
     this.insurance = InsuranceStatus.unknown,
     this.compensationAmount = 0,
     this.processingCost = 0,
@@ -212,6 +284,7 @@ class AccidentRecord {
   }) : id = id ?? const Uuid().v4(),
        fiscalYear = fiscalYear ?? calcFiscalYear(occurredAt),
        fiscalMonth = fiscalMonth ?? occurredAt.month,
+       involvedPersons = involvedPersons ?? const [],
        causeAnalysis = causeAnalysis ?? const CauseAnalysis(),
        followUp = followUp ?? const FollowUpRecord(),
        createdAt = createdAt ?? DateTime.now(),
@@ -227,6 +300,16 @@ class AccidentRecord {
   NumberingCategory? get numberingCategory =>
       numberingCategoryOf(office: office, responsibility: responsibility);
 
+  /// 発生者が1名も登録されていないか。
+  bool get hasNoInvolvedPerson => involvedPersons.isEmpty;
+
+  /// 表示用: 発生者氏名をカンマ区切りで連結したもの。
+  /// (一覧・検索・常習者分析など、複数名を1文字列として扱いたい箇所で使用)
+  String get involvedNamesText => involvedPersons
+      .map((p) => p.name)
+      .where((n) => n.isNotEmpty)
+      .join('、');
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'no': no,
@@ -239,13 +322,7 @@ class AccidentRecord {
     'fiscalYear': fiscalYear,
     'fiscalMonth': fiscalMonth,
     'location': location,
-    'employeeNumber': employeeNumber,
-    'driverName': driverName,
-    'age': age,
-    'yearsOfServiceYear': yearsOfServiceYear,
-    'yearsOfServiceMonth': yearsOfServiceMonth,
-    'yearsOfExperienceYear': yearsOfExperienceYear,
-    'yearsOfExperienceMonth': yearsOfExperienceMonth,
+    'involvedPersons': involvedPersons.map((p) => p.toMap()).toList(),
     'insurance': insurance.name,
     'compensationAmount': compensationAmount,
     'processingCost': processingCost,
@@ -300,13 +377,7 @@ class AccidentRecord {
       // 読み込み時に全角へ正規化する(Excel移行データ・既存Firestoreデータにも
       // 自動適用され、データ移行スクリプトなしで表示不具合が解消される)。
       location: normalizeHalfWidthKana(map['location'] as String? ?? ''),
-      employeeNumber: map['employeeNumber'] as String? ?? '',
-      driverName: normalizeHalfWidthKana(map['driverName'] as String? ?? ''),
-      age: map['age'] as int?,
-      yearsOfServiceYear: map['yearsOfServiceYear'] as int?,
-      yearsOfServiceMonth: map['yearsOfServiceMonth'] as int?,
-      yearsOfExperienceYear: map['yearsOfExperienceYear'] as int?,
-      yearsOfExperienceMonth: map['yearsOfExperienceMonth'] as int?,
+      involvedPersons: _parseInvolvedPersons(map),
       insurance: InsuranceStatus.values.firstWhere(
         (e) => e.name == map['insurance'],
         orElse: () => InsuranceStatus.unknown,
@@ -337,6 +408,42 @@ class AccidentRecord {
     );
   }
 
+  /// 発生者情報の読み込み(後方互換対応)。
+  /// 新形式: map['involvedPersons'] (List) が存在すればそれを使用する。
+  /// 旧形式: 単一の発生者(driverName/employeeNumber/age/勤続年数等)の
+  /// フィールドが個別に保存されている既存データ(複数名対応前に登録された
+  /// 全レコード)は、1名分のPersonInvolvedとして自動的に読み込む。
+  /// これにより、データ移行スクリプトなしで既存データがそのまま
+  /// 「発生者1名」として表示・編集できる。
+  static List<PersonInvolved> _parseInvolvedPersons(Map<dynamic, dynamic> map) {
+    final list = map['involvedPersons'] as List?;
+    if (list != null) {
+      return list
+          .map((e) => PersonInvolved.fromMap(e as Map<dynamic, dynamic>))
+          .toList();
+    }
+    // 旧形式からの後方互換読み込み。
+    final legacyName = normalizeHalfWidthKana(
+      map['driverName'] as String? ?? '',
+    );
+    final legacyEmpNo = map['employeeNumber'] as String? ?? '';
+    final legacyAge = map['age'] as int?;
+    final legacyServiceYear = map['yearsOfServiceYear'] as int?;
+    final legacyServiceMonth = map['yearsOfServiceMonth'] as int?;
+    final legacyExpYear = map['yearsOfExperienceYear'] as int?;
+    final legacyExpMonth = map['yearsOfExperienceMonth'] as int?;
+    final legacyPerson = PersonInvolved(
+      name: legacyName,
+      employeeNumber: legacyEmpNo,
+      age: legacyAge,
+      yearsOfServiceYear: legacyServiceYear,
+      yearsOfServiceMonth: legacyServiceMonth,
+      yearsOfExperienceYear: legacyExpYear,
+      yearsOfExperienceMonth: legacyExpMonth,
+    );
+    return legacyPerson.isEmpty ? const [] : [legacyPerson];
+  }
+
   AccidentRecord copyWith({
     int? no,
     OfficeDept? office,
@@ -347,13 +454,7 @@ class AccidentRecord {
     bool clearPartsCause = false,
     DateTime? occurredAt,
     String? location,
-    String? employeeNumber,
-    String? driverName,
-    int? age,
-    int? yearsOfServiceYear,
-    int? yearsOfServiceMonth,
-    int? yearsOfExperienceYear,
-    int? yearsOfExperienceMonth,
+    List<PersonInvolved>? involvedPersons,
     InsuranceStatus? insurance,
     double? compensationAmount,
     double? processingCost,
@@ -382,15 +483,7 @@ class AccidentRecord {
       fiscalYear: calcFiscalYear(newOccurredAt),
       fiscalMonth: newOccurredAt.month,
       location: location ?? this.location,
-      employeeNumber: employeeNumber ?? this.employeeNumber,
-      driverName: driverName ?? this.driverName,
-      age: age ?? this.age,
-      yearsOfServiceYear: yearsOfServiceYear ?? this.yearsOfServiceYear,
-      yearsOfServiceMonth: yearsOfServiceMonth ?? this.yearsOfServiceMonth,
-      yearsOfExperienceYear:
-          yearsOfExperienceYear ?? this.yearsOfExperienceYear,
-      yearsOfExperienceMonth:
-          yearsOfExperienceMonth ?? this.yearsOfExperienceMonth,
+      involvedPersons: involvedPersons ?? this.involvedPersons,
       insurance: insurance ?? this.insurance,
       compensationAmount: compensationAmount ?? this.compensationAmount,
       processingCost: processingCost ?? this.processingCost,

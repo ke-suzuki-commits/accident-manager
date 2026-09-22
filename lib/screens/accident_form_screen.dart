@@ -28,15 +28,15 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
   late InsuranceStatus _insurance;
 
   final _locationCtrl = TextEditingController();
-  final _driverNameCtrl = TextEditingController();
-  final _employeeNumberCtrl = TextEditingController();
-  final _ageCtrl = TextEditingController();
-  final _yearsOfServiceYearCtrl = TextEditingController();
-  final _yearsOfServiceMonthCtrl = TextEditingController();
   final _counterpartyCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   final _compensationCtrl = TextEditingController();
   final _processingCostCtrl = TextEditingController();
+
+  // 発生者情報(複数名対応)。ドライバーに限らず事務員・倉庫作業者等も
+  // 対象となり、また起因者が複数名の場合もあるため、リスト形式で
+  // 入力欄を動的に追加・削除できるようにする。
+  final List<_PersonFormData> _persons = [];
 
   bool get _isEdit => widget.existing != null;
 
@@ -53,11 +53,15 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
     _insurance = e?.insurance ?? InsuranceStatus.unknown;
 
     _locationCtrl.text = e?.location ?? '';
-    _driverNameCtrl.text = e?.driverName ?? '';
-    _employeeNumberCtrl.text = e?.employeeNumber ?? '';
-    _ageCtrl.text = e?.age?.toString() ?? '';
-    _yearsOfServiceYearCtrl.text = e?.yearsOfServiceYear?.toString() ?? '';
-    _yearsOfServiceMonthCtrl.text = e?.yearsOfServiceMonth?.toString() ?? '';
+    if (e != null && e.involvedPersons.isNotEmpty) {
+      for (final p in e.involvedPersons) {
+        _persons.add(_PersonFormData.fromPerson(p));
+      }
+    } else {
+      // 新規登録時、または発生者が1名も登録されていない既存データの場合は
+      // 最低1名分の入力欄を用意しておく(空欄のままでも保存は可能)。
+      _persons.add(_PersonFormData());
+    }
     _counterpartyCtrl.text = e?.counterparty ?? '';
     _descriptionCtrl.text = e?.description ?? '';
     _compensationCtrl.text = e != null && e.compensationAmount != 0
@@ -71,16 +75,25 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
   @override
   void dispose() {
     _locationCtrl.dispose();
-    _driverNameCtrl.dispose();
-    _employeeNumberCtrl.dispose();
-    _ageCtrl.dispose();
-    _yearsOfServiceYearCtrl.dispose();
-    _yearsOfServiceMonthCtrl.dispose();
+    for (final p in _persons) {
+      p.dispose();
+    }
     _counterpartyCtrl.dispose();
     _descriptionCtrl.dispose();
     _compensationCtrl.dispose();
     _processingCostCtrl.dispose();
     super.dispose();
+  }
+
+  void _addPerson() {
+    setState(() => _persons.add(_PersonFormData()));
+  }
+
+  void _removePerson(int index) {
+    setState(() {
+      _persons[index].dispose();
+      _persons.removeAt(index);
+    });
   }
 
   Future<void> _pickDate() async {
@@ -153,11 +166,12 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
       // (例: 「ｽｽﾞｷ」の濁点が豆腐表示になる)を防ぐため、保存時に
       // 全角カタカナへ正規化しておく。
       location: normalizeHalfWidthKana(_locationCtrl.text.trim()),
-      driverName: normalizeHalfWidthKana(_driverNameCtrl.text.trim()),
-      employeeNumber: _employeeNumberCtrl.text.trim(),
-      age: parseIntOrNull(_ageCtrl.text),
-      yearsOfServiceYear: parseIntOrNull(_yearsOfServiceYearCtrl.text),
-      yearsOfServiceMonth: parseIntOrNull(_yearsOfServiceMonthCtrl.text),
+      // 発生者情報(複数名)。氏名・社員番号・年齢等が全て空の入力欄は
+      // 保存対象から除外する(空の発生者が配列に紛れ込まないようにする)。
+      involvedPersons: _persons
+          .map((p) => p.toPerson())
+          .where((p) => !p.isEmpty)
+          .toList(),
       counterparty: normalizeHalfWidthKana(_counterpartyCtrl.text.trim()),
       description: normalizeHalfWidthKana(_descriptionCtrl.text.trim()),
       insurance: _insurance,
@@ -284,40 +298,7 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
                   ),
                 ]),
                 const SizedBox(height: 16),
-                _sectionCard('ドライバー情報', [
-                  _textField(_driverNameCtrl, '氏名'),
-                  const SizedBox(height: 12),
-                  _textField(_employeeNumberCtrl, '社員番号'),
-                  const SizedBox(height: 12),
-                  _textField(
-                    _ageCtrl,
-                    '年齢',
-                    keyboardType: TextInputType.number,
-                    isNumeric: true,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _textField(
-                          _yearsOfServiceYearCtrl,
-                          '勤続年数（年）',
-                          keyboardType: TextInputType.number,
-                          isNumeric: true,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _textField(
-                          _yearsOfServiceMonthCtrl,
-                          '勤続年数（月）',
-                          keyboardType: TextInputType.number,
-                          isNumeric: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ]),
+                _buildInvolvedPersonsSection(),
                 const SizedBox(height: 16),
                 _sectionCard('金額・保険情報', [
                   _textField(
@@ -360,6 +341,135 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// 「発生者情報」セクション。
+  /// ドライバーだけでなく事務員・倉庫作業者等も対象となるため中立的な
+  /// 名称にしており、複数名(起因者が複数の場合)を動的に追加・削除できる。
+  Widget _buildInvolvedPersonsSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '発生者情報',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _addPerson,
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                label: const Text('発生者を追加'),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 2, bottom: 12),
+            child: Text(
+              '事故の発生者(起因者)を入力してください。ドライバーに限らず、'
+              '事務員・倉庫作業者等が発生させた場合も対象です。'
+              '起因者が複数名の場合は「発生者を追加」で人数分入力できます。',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ),
+          for (var i = 0; i < _persons.length; i++)
+            _personCard(index: i, data: _persons[i]),
+        ],
+      ),
+    );
+  }
+
+  Widget _personCard({required int index, required _PersonFormData data}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '発生者${index + 1}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const Spacer(),
+              if (_persons.length > 1)
+                InkWell(
+                  onTap: () => _removePerson(index),
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _textField(data.nameCtrl, '氏名'),
+          const SizedBox(height: 12),
+          _textField(data.employeeNumberCtrl, '社員番号'),
+          const SizedBox(height: 12),
+          _textField(
+            data.ageCtrl,
+            '年齢',
+            keyboardType: TextInputType.number,
+            isNumeric: true,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _textField(
+                  data.yearsOfServiceYearCtrl,
+                  '勤続年数（年）',
+                  keyboardType: TextInputType.number,
+                  isNumeric: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _textField(
+                  data.yearsOfServiceMonthCtrl,
+                  '勤続年数（月）',
+                  keyboardType: TextInputType.number,
+                  isNumeric: true,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -460,5 +570,60 @@ class _AccidentFormScreenState extends State<AccidentFormScreen> {
           .toList(),
       onChanged: onChanged,
     );
+  }
+}
+
+/// 発生者1名分の入力状態を保持するヘルパークラス。
+/// UI側のTextEditingControllerと、保存用のPersonInvolvedモデルとの
+/// 相互変換を担う。
+class _PersonFormData {
+  final TextEditingController nameCtrl;
+  final TextEditingController employeeNumberCtrl;
+  final TextEditingController ageCtrl;
+  final TextEditingController yearsOfServiceYearCtrl;
+  final TextEditingController yearsOfServiceMonthCtrl;
+
+  _PersonFormData({
+    String name = '',
+    String employeeNumber = '',
+    String age = '',
+    String yearsOfServiceYear = '',
+    String yearsOfServiceMonth = '',
+  }) : nameCtrl = TextEditingController(text: name),
+       employeeNumberCtrl = TextEditingController(text: employeeNumber),
+       ageCtrl = TextEditingController(text: age),
+       yearsOfServiceYearCtrl = TextEditingController(text: yearsOfServiceYear),
+       yearsOfServiceMonthCtrl = TextEditingController(
+         text: yearsOfServiceMonth,
+       );
+
+  factory _PersonFormData.fromPerson(PersonInvolved p) {
+    return _PersonFormData(
+      name: p.name,
+      employeeNumber: p.employeeNumber,
+      age: p.age?.toString() ?? '',
+      yearsOfServiceYear: p.yearsOfServiceYear?.toString() ?? '',
+      yearsOfServiceMonth: p.yearsOfServiceMonth?.toString() ?? '',
+    );
+  }
+
+  PersonInvolved toPerson() {
+    return PersonInvolved(
+      name: normalizeHalfWidthKana(nameCtrl.text.trim()),
+      employeeNumber: employeeNumberCtrl.text.trim(),
+      age: parseIntOrNull(ageCtrl.text),
+      yearsOfServiceYear: parseIntOrNull(yearsOfServiceYearCtrl.text),
+      yearsOfServiceMonth: parseIntOrNull(yearsOfServiceMonthCtrl.text),
+      // 業務経験年数は現行フォームでは未入力項目のためnull固定。
+      // (旧フォームにも入力欄が無かったため機能的な変更はない)
+    );
+  }
+
+  void dispose() {
+    nameCtrl.dispose();
+    employeeNumberCtrl.dispose();
+    ageCtrl.dispose();
+    yearsOfServiceYearCtrl.dispose();
+    yearsOfServiceMonthCtrl.dispose();
   }
 }

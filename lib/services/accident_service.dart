@@ -8,12 +8,12 @@ import 'edit_log_service.dart';
 /// 複数事故を起こしている事故惹起者（多重事故者）の集計結果1件分。
 /// 社員番号があればそれをキーに、無ければ氏名をキーにグルーピングする。
 class RepeatOffender {
-  final String driverName;
+  final String name;
   final String employeeNumber;
   final List<AccidentRecord> records; // 発生日時が新しい順
 
   RepeatOffender({
-    required this.driverName,
+    required this.name,
     required this.employeeNumber,
     required this.records,
   });
@@ -236,13 +236,7 @@ class AccidentService extends ChangeNotifier {
       fiscalYear: r.fiscalYear,
       fiscalMonth: r.fiscalMonth,
       location: r.location,
-      employeeNumber: r.employeeNumber,
-      driverName: r.driverName,
-      age: r.age,
-      yearsOfServiceYear: r.yearsOfServiceYear,
-      yearsOfServiceMonth: r.yearsOfServiceMonth,
-      yearsOfExperienceYear: r.yearsOfExperienceYear,
-      yearsOfExperienceMonth: r.yearsOfExperienceMonth,
+      involvedPersons: r.involvedPersons,
       insurance: r.insurance,
       compensationAmount: r.compensationAmount,
       processingCost: r.processingCost,
@@ -445,13 +439,17 @@ class AccidentService extends ChangeNotifier {
 
   /// 複数事故を起こしている事故惹起者（多重事故者）を集計する。
   ///
-  /// グルーピングは氏名（driverName）を第一のキーとする。
+  /// グルーピングは氏名（発生者情報のname）を第一のキーとする。
   /// ※ 社員番号(employeeNumber)は移行データ等で未入力・仮値のまま入っている
   /// ケースがあり、これをキーにすると本来別人の事故が同一人物として
   /// 誤って集約されてしまう不具合があったため、氏名一致を優先する方式に
-  /// 変更した。氏名が空の記録のみ、社員番号があればそれをキーとして扱う。
-  /// 氏名・社員番号のいずれも空の記録は個人特定ができないため集計対象から
+  /// 変更した。氏名が空の発生者のみ、社員番号があればそれをキーとして扱う。
+  /// 氏名・社員番号のいずれも空の発生者は個人特定ができないため集計対象から
   /// 除外する。
+  ///
+  /// ※ 1件の事故記録に発生者が複数名登録されている場合(例:複数人の連携
+  /// ミス)は、その事故を発生者それぞれの件数としてカウントする
+  /// (1件の事故が複数名の「事故件数」に加算される)。
   ///
   /// ※ ダッシュボード等の「件数」集計と同様に、無責・責任区分不明の事故は
   /// 集計対象から除外する（役員要望に合わせ、有責事故のみを対象とする）。
@@ -460,14 +458,25 @@ class AccidentService extends ChangeNotifier {
   /// 直近の事故が新しい順）に返す。
   List<RepeatOffender> repeatOffenders({int minCount = 2}) {
     final grouped = <String, List<AccidentRecord>>{};
+    // 表示用の氏名・社員番号は、直近(最新)の事故記録の入力内容を優先する
+    // (同一人物でも過去の記録に氏名の表記ゆれ等がある場合があるため)。
+    final latestPersonByKey = <String, PersonInvolved>{};
+    final latestOccurredAtByKey = <String, DateTime>{};
 
     for (final r in _records) {
       if (!r.responsibility.isCountable) continue; // 無責・責任区分不明は除外
-      final name = r.driverName.trim();
-      final empNo = r.employeeNumber.trim();
-      if (name.isEmpty && empNo.isEmpty) continue;
-      final key = name.isNotEmpty ? 'name:$name' : 'emp:$empNo';
-      grouped.putIfAbsent(key, () => []).add(r);
+      for (final p in r.involvedPersons) {
+        final name = p.name.trim();
+        final empNo = p.employeeNumber.trim();
+        if (name.isEmpty && empNo.isEmpty) continue;
+        final key = name.isNotEmpty ? 'name:$name' : 'emp:$empNo';
+        grouped.putIfAbsent(key, () => []).add(r);
+        final prevLatest = latestOccurredAtByKey[key];
+        if (prevLatest == null || r.occurredAt.isAfter(prevLatest)) {
+          latestOccurredAtByKey[key] = r.occurredAt;
+          latestPersonByKey[key] = p;
+        }
+      }
     }
 
     final result = <RepeatOffender>[];
@@ -475,12 +484,10 @@ class AccidentService extends ChangeNotifier {
       if (records.length < minCount) return;
       final sorted = [...records]
         ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
-      // 表示用の氏名・社員番号は、直近(最新)の事故記録の入力内容を優先する
-      // (同一人物でも過去の記録に氏名の表記ゆれ等がある場合があるため)。
-      final latest = sorted.first;
+      final latest = latestPersonByKey[key]!;
       result.add(
         RepeatOffender(
-          driverName: latest.driverName.trim(),
+          name: latest.name.trim(),
           employeeNumber: latest.employeeNumber.trim(),
           records: sorted,
         ),

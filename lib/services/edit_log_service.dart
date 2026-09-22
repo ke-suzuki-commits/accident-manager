@@ -115,18 +115,10 @@ class EditLogService {
     );
     check('発生場所', before.location, after.location);
     check('発生内容', before.description, after.description);
-    check('氏名', before.driverName, after.driverName);
-    check('社員番号', before.employeeNumber, after.employeeNumber);
-    check('年齢', before.age?.toString() ?? '', after.age?.toString() ?? '');
     check(
-      '勤続年数',
-      _fmtYm(before.yearsOfServiceYear, before.yearsOfServiceMonth),
-      _fmtYm(after.yearsOfServiceYear, after.yearsOfServiceMonth),
-    );
-    check(
-      '業務経験年数',
-      _fmtYm(before.yearsOfExperienceYear, before.yearsOfExperienceMonth),
-      _fmtYm(after.yearsOfExperienceYear, after.yearsOfExperienceMonth),
+      '発生者情報',
+      _fmtInvolvedPersons(before.involvedPersons),
+      _fmtInvolvedPersons(after.involvedPersons),
     );
     check('相手方/荷主', before.counterparty, after.counterparty);
     check('保険有無', before.insurance.label, after.insurance.label);
@@ -157,5 +149,27 @@ class EditLogService {
   String _fmtYm(int? y, int? m) {
     if (y == null && m == null) return '';
     return '${y ?? 0}年${m ?? 0}ヶ月';
+  }
+
+  /// 発生者情報(複数名)を、編集履歴上で分かりやすい1つの文字列に整形する。
+  /// 例: "田中太郎(社員番号:123, 年齢:35歳, 勤続:5年3ヶ月); 佐藤花子(...)"
+  String _fmtInvolvedPersons(List<PersonInvolved> persons) {
+    if (persons.isEmpty) return '';
+    return persons.map((p) {
+      final name = p.name.isEmpty ? '(氏名未入力)' : p.name;
+      final details = <String>[];
+      if (p.employeeNumber.isNotEmpty) {
+        details.add('社員番号:${p.employeeNumber}');
+      }
+      if (p.age != null) details.add('年齢:${p.age}歳');
+      final service = _fmtYm(p.yearsOfServiceYear, p.yearsOfServiceMonth);
+      if (service.isNotEmpty) details.add('勤続:$service');
+      final exp = _fmtYm(
+        p.yearsOfExperienceYear,
+        p.yearsOfExperienceMonth,
+      );
+      if (exp.isNotEmpty) details.add('経験:$exp');
+      return details.isEmpty ? name : '$name(${details.join(', ')})';
+    }).join('; ');
   }
 }

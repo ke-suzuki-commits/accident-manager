@@ -367,35 +367,12 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
   }
 
   Widget _buildInfoSection(AccidentRecord r) {
-    // 事故記録の「班」は発生時点のもの。現在の所属班は、班マスタと
-    // 運転者氏名を都度突き合わせて求める(事故記録自体は書き換えない)。
-    final currentTeam = r.driverName.trim().isEmpty
-        ? null
-        : context.watch<TeamMasterService>().findTeamByMemberName(
-            r.driverName,
-          );
     final rows = <(String, String)>[
       ('発生部署', r.office.label),
       ('発生区分（庸車/自社）', r.office.isCharter ? '庸車事故' : '自社事故'),
       ('班（発生時点）', r.team.label),
-      if (currentTeam != null) ('現在の所属班', currentTeam.label),
       ('責任区分', r.responsibility.label),
       if (r.partsCause != null) ('発生要因', r.partsCause!.label),
-      ('氏名', r.driverName.isEmpty ? '-' : r.driverName),
-      ('社員番号', r.employeeNumber.isEmpty ? '-' : r.employeeNumber),
-      ('年齢', r.age != null ? '${r.age}歳' : '-'),
-      (
-        '勤続年数',
-        r.yearsOfServiceYear != null
-            ? '${r.yearsOfServiceYear}年${r.yearsOfServiceMonth ?? 0}ヶ月'
-            : '-',
-      ),
-      (
-        '業務経験年数',
-        r.yearsOfExperienceYear != null
-            ? '${r.yearsOfExperienceYear}年${r.yearsOfExperienceMonth ?? 0}ヶ月'
-            : '-',
-      ),
       ('相手方/荷主', r.counterparty.isEmpty ? '-' : r.counterparty),
       ('保険有無', r.insurance.label),
       (
@@ -431,6 +408,113 @@ class _AccidentDetailScreenState extends State<AccidentDetailScreen> {
               for (final row in rows)
                 SizedBox(
                   width: 220,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        row.$1,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        row.$2,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '発生者情報',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (r.involvedPersons.isEmpty)
+            const Text(
+              '発生者情報が未入力です。',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < r.involvedPersons.length; i++)
+                  _personInfoCard(r.involvedPersons[i], index: i),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 発生者1名分の情報カード。班マスタとの現在の所属班の突き合わせは
+  /// 氏名をキーに都度行う(事故記録自体の「班」は発生時点のものであり
+  /// 現在の所属とは限らないため)。
+  Widget _personInfoCard(PersonInvolved p, {required int index}) {
+    final currentTeam = p.name.trim().isEmpty
+        ? null
+        : context.watch<TeamMasterService>().findTeamByMemberName(p.name);
+    final rows = <(String, String)>[
+      ('氏名', p.name.isEmpty ? '-' : p.name),
+      ('社員番号', p.employeeNumber.isEmpty ? '-' : p.employeeNumber),
+      if (currentTeam != null) ('現在の所属班', currentTeam.label),
+      ('年齢', p.age != null ? '${p.age}歳' : '-'),
+      (
+        '勤続年数',
+        p.yearsOfServiceYear != null
+            ? '${p.yearsOfServiceYear}年${p.yearsOfServiceMonth ?? 0}ヶ月'
+            : '-',
+      ),
+      (
+        '業務経験年数',
+        p.yearsOfExperienceYear != null
+            ? '${p.yearsOfExperienceYear}年${p.yearsOfExperienceMonth ?? 0}ヶ月'
+            : '-',
+      ),
+    ];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '発生者${index + 1}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: AppColors.secondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 24,
+            runSpacing: 10,
+            children: [
+              for (final row in rows)
+                SizedBox(
+                  width: 200,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
