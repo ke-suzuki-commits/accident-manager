@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +23,41 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int? _selectedYear;
+
+  // ---- 現在日時表示(1分ごとに自動更新) ----
+  late DateTime _now;
+  Timer? _clockTimer;
+  static const _weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'];
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    // 次の分の0秒ちょうどに最初の更新を合わせ、以後は1分ごとに更新する。
+    final secondsToNextMinute = 60 - _now.second;
+    _clockTimer = Timer(Duration(seconds: secondsToNextMinute), () {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+      _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (!mounted) return;
+        setState(() => _now = DateTime.now());
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 「2026年10月6日(火)16:18現在」形式の文字列を組み立てる。
+  String get _currentDateTimeLabel {
+    final weekday = _weekdayLabels[_now.weekday - 1];
+    final hh = _now.hour.toString().padLeft(2, '0');
+    final mm = _now.minute.toString().padLeft(2, '0');
+    return '${_now.year}年${_now.month}月${_now.day}日($weekday) $hh:$mm現在';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +107,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildCurrentDateTime(),
+                  const SizedBox(height: 10),
                   _buildYearSelector(years, currentYear, selectedYear),
                   const SizedBox(height: 16),
                   _buildStatCards(
@@ -392,6 +431,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
         fontWeight: FontWeight.bold,
         color: AppColors.textPrimary,
       ),
+    );
+  }
+
+  /// 現在の年月日・曜日・時刻を表示する(1分ごとに自動更新)。
+  /// 例: 「2026年10月6日(火) 16:18現在」
+  Widget _buildCurrentDateTime() {
+    return Row(
+      children: [
+        const Icon(
+          Icons.access_time_rounded,
+          size: 15,
+          color: AppColors.textSecondary,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          _currentDateTimeLabel,
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 
